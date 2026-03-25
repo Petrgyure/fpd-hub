@@ -392,6 +392,14 @@ body.mf-leadgen   .track-filter[data-track="ecommerce"] { display: none; }
 .tag-leadgen   { background: #F0F9FF; color: #0369A1; }
 .tag-both      { background: rgba(120,57,238,0.06); color: #7839EE; border: 1px solid rgba(120,57,238,0.15); }
 
+/* ===== SECTION BADGES ===== */
+.section-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
+.cl-group-badges { display: flex; gap: 5px; margin-left: 8px; }
+
+/* Sidebar platform filtering */
+body.pf-google .sidebar-item[data-platform="meta"]   { display: none; }
+body.pf-meta   .sidebar-item[data-platform="google"] { display: none; }
+
 /* ===== PAGE HEADS ===== */
 .page-title { font-size: 21px; font-weight: 600; color: #000000; margin-bottom: 4px; letter-spacing: -0.025em; }
 .page-sub { font-size: 13.5px; color: rgb(154,154,154); margin-bottom: 24px; line-height: 1.5; }
@@ -536,7 +544,8 @@ const FPD = (() => {
       const mm = chunk.match(/<!--\s*module:\s*(\w+)(?:\s*\|\s*(.*?))?\s*-->/);
       if (mm) {
         const nextChunk = moduleParts[i + 1] || '';
-        doc.modules.push(buildModule(mm[1], nextChunk));
+        const moduleMeta = parseMeta(mm[2] || '');
+        doc.modules.push(buildModule(mm[1], nextChunk, moduleMeta));
       } else if (i === 0) {
         doc.intro = chunk.trim();
       }
@@ -545,7 +554,7 @@ const FPD = (() => {
     return doc;
   }
 
-  function buildModule(id, raw) {
+  function buildModule(id, raw, moduleMeta = {}) {
     const titleMatch = raw.match(/^##\s+(.+)/m);
     const title = titleMatch
       ? titleMatch[1].replace(/^Module\s+\d+:\s*/i, '').trim()
@@ -567,7 +576,7 @@ const FPD = (() => {
       }
     });
 
-    return { id, title, introRaw: moduleIntro, sections };
+    return { id, title, introRaw: moduleIntro, sections, ...moduleMeta };
   }
 
   function parseMeta(str) {
@@ -679,11 +688,30 @@ const FPD = (() => {
     }
   }
 
+  // Badge HTML for platform + model tracks
+  function platformBadges(mod, sec) {
+    let html = '';
+    if (mod && mod.track === 'google') html += '<span class="tag tag-google">Google</span>';
+    else if (mod && mod.track === 'meta') html += '<span class="tag tag-meta">Meta</span>';
+    if (sec && sec.track === 'ecommerce') html += '<span class="tag tag-ecommerce">E-com</span>';
+    else if (sec && sec.track === 'leadgen') html += '<span class="tag tag-leadgen">Lead Gen</span>';
+    return html;
+  }
+
   // Apply body filter classes
   function applyFilter() {
     ['pf-google','pf-meta','mf-ecommerce','mf-leadgen'].forEach(c => document.body.classList.remove(c));
     if (state.platform !== 'all') document.body.classList.add(`pf-${state.platform}`);
     if (state.model   !== 'all') document.body.classList.add(`mf-${state.model}`);
+
+    // In Learn tab: navigate away from incompatible platform module
+    if (state.tab === 'learn' && state.platform !== 'all' && parsed) {
+      const cur = parsed.modules.find(m => m.id === state.module);
+      if (cur && cur.track && cur.track !== state.platform) {
+        const first = parsed.modules.find(m => !m.track || m.track === state.platform);
+        if (first) { state.module = first.id; renderLearn(); return; }
+      }
+    }
   }
 
   // ── PROGRESS ──────────────────────────────────────────────
@@ -732,7 +760,7 @@ const FPD = (() => {
     parsed.modules.forEach((m, i) => {
       const isActive = m.id === state.module ? 'active' : '';
       html += `
-        <div class="sidebar-item ${isActive}" onclick="FPD.goModule('${m.id}')">
+        <div class="sidebar-item ${isActive}" onclick="FPD.goModule('${m.id}')"${m.track ? ` data-platform="${m.track}"` : ''}>
           <div class="sidebar-num">${i + 1}</div>
           <span class="sidebar-item-label">${m.title}</span>
           <div class="sidebar-pbar-wrap">
@@ -770,7 +798,11 @@ const FPD = (() => {
 
     // Sections
     mod.sections.forEach(sec => {
-      html += `<div class="mc" id="sec-${sec.id}">${mdToHtml(sec.raw, sec.id)}</div>`;
+      const badges = platformBadges(mod, sec);
+      html += `<div class="mc" id="sec-${sec.id}">
+        ${badges ? `<div class="section-badges">${badges}</div>` : ''}
+        ${mdToHtml(sec.raw, sec.id)}
+      </div>`;
     });
 
     document.getElementById('content').innerHTML = html;
@@ -796,13 +828,18 @@ const FPD = (() => {
     let cards = '';
     qrSections.forEach(s => {
       const bodyHtml = mdToHtml(s.raw, s.id);
+      const mod = parsed.modules.find(m => m.sections.some(sec => sec.id === s.id));
+      const badges = platformBadges(mod, s);
+      const trackAttr = mod && mod.track ? ` class="track-filter" data-track="${mod.track}"` : '';
       cards += `
-        <div class="qr-card">
-          <div class="qr-card-head">
-            <span class="qr-card-title">${sectionTitle(s.id)}</span>
-            <span class="tag tag-both">${s.moduleName}</span>
+        <div${trackAttr}>
+          <div class="qr-card">
+            <div class="qr-card-head">
+              <span class="qr-card-title">${sectionTitle(s.id)}</span>
+              ${badges || `<span class="tag tag-both">${s.moduleName}</span>`}
+            </div>
+            <div class="qr-card-body mc">${bodyHtml}</div>
           </div>
-          <div class="qr-card-body mc">${bodyHtml}</div>
         </div>`;
     });
 
@@ -850,14 +887,19 @@ const FPD = (() => {
           </div>`;
       });
 
+      const modBadges = platformBadges(m, null);
+      const clTrackAttr = m.track ? ` class="track-filter" data-track="${m.track}"` : '';
       html += `
-        <div class="cl-group">
-          <div class="cl-group-head">
-            <span class="cl-group-title">${m.title}</span>
-            <div class="cl-pbar-wrap"><div class="cl-pbar" style="width:${modPct}%"></div></div>
-            <span class="cl-count">${modDone}/${modTotal}</span>
+        <div${clTrackAttr}>
+          <div class="cl-group">
+            <div class="cl-group-head">
+              <span class="cl-group-title">${m.title}</span>
+              ${modBadges ? `<span class="cl-group-badges">${modBadges}</span>` : ''}
+              <div class="cl-pbar-wrap"><div class="cl-pbar" style="width:${modPct}%"></div></div>
+              <span class="cl-count">${modDone}/${modTotal}</span>
+            </div>
+            ${cards}
           </div>
-          ${cards}
         </div>`;
     });
 
