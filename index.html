@@ -451,6 +451,31 @@ body.mf-leadgen   .track-filter[data-track="ecommerce"] { display: none; }
 .tag-leadgen   { background: #F0F9FF; color: #0369A1; }
 .tag-both      { background: rgba(120,57,238,0.06); color: #7839EE; border: 1px solid rgba(120,57,238,0.15); }
 
+/* ===== GLOSSARY ===== */
+.glossary-layout { display: grid; grid-template-columns: 180px 1fr; gap: 24px; align-items: start; }
+.glossary-nav { position: sticky; top: 20px; background: #fff; border-radius: 16px; border: 1.25px solid rgba(0,0,0,0.08); padding: 14px 0; }
+.glossary-nav-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: rgb(154,154,154); padding: 0 14px 8px; }
+.glossary-alpha { display: flex; flex-wrap: wrap; gap: 3px; padding: 0 14px 12px; }
+.glossary-alpha-btn { width: 24px; height: 24px; border-radius: 5px; border: none; background: transparent; font-size: 11px; font-weight: 600; color: rgb(100,100,100); cursor: pointer; transition: all 0.12s; display: flex; align-items: center; justify-content: center; font-family: inherit; }
+.glossary-alpha-btn:hover { background: rgba(120,57,238,0.08); color: #7839EE; }
+.glossary-alpha-btn.active { background: #7839EE; color: #fff; }
+.glossary-alpha-btn:disabled { opacity: 0.25; cursor: default; }
+.glossary-cat-filter { padding: 8px 14px 0; border-top: 1px solid rgba(0,0,0,0.06); }
+.glossary-cat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: rgb(154,154,154); margin-bottom: 6px; }
+.glossary-cat-btn { display: block; width: 100%; text-align: left; padding: 5px 8px; border: none; background: transparent; border-radius: 6px; font-size: 12px; font-family: inherit; color: rgb(80,80,80); cursor: pointer; transition: background 0.12s; }
+.glossary-cat-btn:hover { background: rgba(0,0,0,0.04); }
+.glossary-cat-btn.active { background: rgba(120,57,238,0.08); color: #7839EE; font-weight: 600; }
+.glossary-group { margin-bottom: 32px; }
+.glossary-letter { font-size: 22px; font-weight: 700; color: #7839EE; margin-bottom: 12px; letter-spacing: -0.03em; padding-bottom: 8px; border-bottom: 2px solid rgba(120,57,238,0.15); }
+.glossary-terms { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.glossary-card { background: #fff; border-radius: 14px; border: 1.25px solid rgba(0,0,0,0.08); padding: 14px 16px; }
+.glossary-card-head { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 7px; flex-wrap: wrap; }
+.glossary-term { font-size: 14px; font-weight: 700; color: #000; letter-spacing: -0.01em; }
+.glossary-abbr { font-size: 10px; font-weight: 700; background: rgb(247,247,250); color: rgb(100,100,100); border-radius: 4px; padding: 1px 5px; margin-top: 2px; flex-shrink: 0; }
+.glossary-def { font-size: 12.5px; color: rgba(0,0,0,0.65); line-height: 1.55; }
+.glossary-def mark { background: rgba(120,57,238,0.12); color: #7839EE; border-radius: 2px; padding: 0 2px; }
+.glossary-empty { padding: 40px; text-align: center; color: rgb(154,154,154); font-size: 14px; }
+
 /* ===== SECTION BADGES ===== */
 .section-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
 .cl-group-badges { display: flex; gap: 5px; margin-left: 8px; }
@@ -523,6 +548,7 @@ body.pf-meta   .sidebar-item[data-platform="google"] { display: none; }
       <button class="tab-btn" data-tab="quickref">Quick Reference</button>
       <button class="tab-btn" data-tab="checklists">Checklists</button>
       <button class="tab-btn" data-tab="progress">My Progress <span class="tab-badge" id="apex-badge">0%</span></button>
+      <button class="tab-btn" data-tab="glossary">Glossary</button>
     </nav>
 
     <!-- Search -->
@@ -1310,6 +1336,7 @@ const FPD = (() => {
     else if (tab === 'quickref')   renderQuickRef();
     else if (tab === 'checklists') renderChecklists();
     else if (tab === 'progress')   renderProgress();
+    else if (tab === 'glossary')   renderGlossary();
     recalcProgress();
   }
 
@@ -1489,12 +1516,21 @@ const FPD = (() => {
       m.sections.forEach(s => {
         const body = stripMd(s.raw);
         const base = { moduleId: m.id, sectionId: s.id, platform: m.track || null, body, moduleName: m.title };
-        // Always indexable in Learn
         searchIdx.push({ ...base, tab: 'learn', tabLabel: 'Learn', title: sectionTitle(s.id) });
-        // Also in Quick Reference
         if (s.quick_reference) searchIdx.push({ ...base, tab: 'quickref', tabLabel: 'Quick Ref', title: sectionTitle(s.id) });
-        // Also in Checklists
         if (s.checklist && !s.apex) searchIdx.push({ ...base, tab: 'checklists', tabLabel: 'Checklist', title: sectionTitle(s.id) });
+      });
+    });
+    // Add glossary terms
+    VOCAB.forEach(v => {
+      searchIdx.push({
+        tab: 'glossary', tabLabel: 'Glossary',
+        title: v.term + (v.abbr ? ` (${v.abbr})` : ''),
+        body: v.def,
+        platform: v.platform === 'both' ? null : v.platform,
+        moduleName: v.cat,
+        moduleId: null, sectionId: null,
+        _glossaryTerm: v.term
       });
     });
   }
@@ -1574,6 +1610,10 @@ const FPD = (() => {
     } else if (e.tab === 'checklists') {
       goTab('checklists');
       setTimeout(() => document.getElementById(`clg-${e.moduleId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+    } else if (e.tab === 'glossary') {
+      const letter = e._glossaryTerm ? e._glossaryTerm[0].toUpperCase() : null;
+      goTab('glossary');
+      setTimeout(() => document.getElementById(`gl-${letter}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
     }
   }
 
@@ -1617,6 +1657,158 @@ const FPD = (() => {
     });
   }
 
+  // ── GLOSSARY ──────────────────────────────────────────────
+  const VOCAB = [
+    { term: 'Advantage+', abbr: 'ASC', platform: 'meta', cat: 'Campaigns', def: 'Meta\'s AI-driven campaign type that automates audience, creative, and placement decisions. Advantage+ Shopping Campaigns (ASC) saw 70% YoY growth in Q4 2025 and are the primary replacement for manual Shopping campaigns. First-party data is the key input signal.' },
+    { term: 'Advantage+ Audience', platform: 'meta', cat: 'Targeting', def: 'Meta\'s algorithmic audience expansion that replaces manual Lookalike Audience strategy. Instead of you defining seed audiences, Meta\'s AI expands reach based on pixel signals and first-party data. In most cases outperforms manual LALs in 2025.' },
+    { term: 'AI Max', platform: 'google', cat: 'Campaigns', def: 'Google\'s AI-powered search campaign feature enabling broad keyword matching with brand controls. Feeds on first-party data via Customer Match signals and enables Customer Lifecycle Optimization (CLO) together with Data Manager.' },
+    { term: 'ATT', abbr: 'App Tracking Transparency', platform: 'both', cat: 'Privacy', def: 'Apple\'s iOS 14.5+ framework requiring explicit user opt-in before apps can track across other apps and websites. Opt-in rates hover at 25–35%, making 65%+ of iOS users invisible to ad platforms. Drove the shift to first-party data strategies.' },
+    { term: 'Attribution', platform: 'both', cat: 'Measurement', def: 'The process of assigning credit for a conversion to one or more ad touchpoints. Traditional last-click attribution is increasingly unreliable due to signal loss. First-party data improves attribution accuracy by providing deterministic identity signals.' },
+    { term: 'Audience Expansion', platform: 'google', cat: 'Targeting', def: 'Google\'s automatic reach extension for Video and Display campaigns. Replaces Similar Audiences (removed August 2023) for these formats. The algorithm finds users similar to your seed audience based on behaviour and content signals.' },
+    { term: 'BOFU', abbr: 'Bottom of Funnel', platform: 'both', cat: 'Strategy', def: 'The conversion stage of the customer journey — purchase, sign-up, or qualified lead. First-party data is most impactful at BOFU through suppression lists, Customer Match for remarketing, and value-based bidding using CRM signals.' },
+    { term: 'CAPI', abbr: 'Conversions API', platform: 'meta', cat: 'Tracking', def: 'Meta\'s server-side event tracking system that sends conversion data directly from your server to Meta, bypassing browser-based limitations. CAPI v2 (July 2025) added enhanced event matching. Hybrid Pixel + CAPI setup delivers 13–20% CPA improvement over Pixel-only.' },
+    { term: 'CLV', abbr: 'Customer Lifetime Value', platform: 'both', cat: 'Data', def: 'The total predicted revenue from a customer over their entire relationship with your business. Used in LTV-based bidding (Google) and Conversion Leads optimization (Meta) to shift spend toward highest-value customer acquisition.' },
+    { term: 'CLO', abbr: 'Customer Lifecycle Optimization', platform: 'google', cat: 'Campaigns', def: 'Google\'s AI suite in Data Manager (2025) combining Lifecycle Segmentation and Predictive Audiences. Enables automated lifecycle-based targeting across New Customer Acquisition, retention, and win-back without manual audience uploads.' },
+    { term: 'Consent Mode v2', abbr: 'CM v2', platform: 'google', cat: 'Privacy', def: 'Google\'s framework for handling user consent signals in the EEA. Advanced mode sends cookieless pings and allows Google to model conversions for users who decline. From July 21, 2025, sites without CM v2 are blocked from data collection for EEA users. Required for Customer Match effectiveness.' },
+    { term: 'Conversion Leads', platform: 'meta', cat: 'Campaigns', def: 'Meta\'s optimization mode that feeds CRM quality signals (SQL, closed-won) back to Meta\'s algorithm via CAPI. Requires the 15–16 digit Meta Lead ID in your CRM. Delivers up to 15% lower cost-per-quality-lead by teaching Meta to find leads that convert downstream.' },
+    { term: 'Conversion Value Rules', platform: 'google', cat: 'Bidding', def: 'Google Ads rules that adjust the reported conversion value based on audience membership, location, or device. Used to implement LTV-based bidding: e.g., multiply conversion value ×3 for High LTV Customer Match lists so Smart Bidding bids more aggressively for high-value prospects.' },
+    { term: 'CRM', abbr: 'Customer Relationship Management', platform: 'both', cat: 'Data', def: 'A system storing customer contact data, purchase history, and lifecycle stage. The primary source of first-party data for audience uploads. Minimum viable CRM schema for ad platforms: email + phone + first/last name per contact. Match rate depends directly on CRM data quality.' },
+    { term: 'Custom Audiences', platform: 'meta', cat: 'Targeting', def: 'Meta\'s audience type built from your own data sources: customer lists (CRM), website visitors (Pixel), app users, or engagement. Customer List Custom Audiences require 100+ matched users to activate. From September 2025, health/financial status data is blocked for CA targeting.' },
+    { term: 'Customer Match', abbr: 'CM', platform: 'google', cat: 'Targeting', def: 'Google\'s feature for uploading hashed CRM data (email, phone, name, address) to target or suppress known customers. Requires $50K+ lifetime Google Ads spend. Google API-based upload was disabled April 1, 2026 — Data Manager is now mandatory. Minimum 1,000 matched users for Search/Shopping; 100 for YouTube/Display.' },
+    { term: 'Data Manager', platform: 'google', cat: 'Data', def: 'Google\'s centralized data ingestion hub (launched December 9, 2025). The mandatory pipeline for Customer Match, Offline Conversion Import, and Enhanced Conversions. Replaces all legacy API-based upload methods. Supports scheduled connections for automated recurring uploads.' },
+    { term: 'Deduplication', platform: 'both', cat: 'Tracking', def: 'The process of ensuring that a single conversion event is counted only once when reported by both browser (Pixel) and server (CAPI). Implemented via matching event_id parameters between Pixel and CAPI calls. Without deduplication, conversions are double-counted, inflating ROAS.' },
+    { term: 'ECL', abbr: 'Enhanced Conversions for Leads', platform: 'google', cat: 'Tracking', def: 'Google\'s feature for lead-gen advertisers to match leads from Google Ads with CRM outcomes (SQL, closed-won). Sends hashed user data from lead forms back to Google. Improves Smart Bidding by providing downstream conversion quality signals. Requires Google tag or GTM implementation.' },
+    { term: 'EMQ', abbr: 'Event Match Quality', platform: 'meta', cat: 'Tracking', def: 'Meta\'s score (0–10) measuring how reliably CAPI events can be matched to a Meta user. Score depends on how many identifiers (email, phone, name, address, fbclid, IP, user-agent) are sent. Target 7.5+ on all events; 8.8–9.3 for purchase. Scores above 8.5 have diminishing returns.' },
+    { term: 'Enhanced Conversions', abbr: 'EC', platform: 'google', cat: 'Tracking', def: 'Google\'s feature that sends hashed first-party data (email, phone, name, address) from your thank-you page to improve conversion matching. Auto-upgraded by Google if not manually implemented by October 2025. Improves conversion reporting for users who block cookies or use cross-device journeys.' },
+    { term: 'First-Party Data', abbr: 'FPD', platform: 'both', cat: 'Data', def: 'Data you collect directly from your own users through your owned properties (website, app, CRM, purchase history). The highest-quality signal for ad targeting: full control, no sharing, consent-based, and durable against regulatory and browser changes. The core of all modern audience strategies.' },
+    { term: 'GA4', abbr: 'Google Analytics 4', platform: 'google', cat: 'Measurement', def: 'Google\'s current analytics platform (replaced Universal Analytics in July 2023). Enables Predictive Audiences (purchase probability, churn probability) publishable to Google Ads. Requires Google Signals enabled for cross-device tracking. Linked to Google Ads via Data Manager for audience publishing.' },
+    { term: 'GDPR', abbr: 'General Data Protection Regulation', platform: 'both', cat: 'Privacy', def: 'EU regulation (effective 2018) requiring explicit informed consent before collecting personal data for advertising. In EEA, without Consent Mode v2 (Advanced), Google blocks data collection for non-consenting users. Non-compliance can result in fines up to 4% of global annual revenue.' },
+    { term: 'Geo Holdout Test', platform: 'both', cat: 'Measurement', def: 'An incrementality test design that withholds advertising from a geographic region (holdout) while running normally in matched test regions. Compares KPIs between regions to isolate true incremental lift. More practical than user-level holdouts for campaigns with large reach.' },
+    { term: 'Hashing', platform: 'both', cat: 'Privacy', def: 'One-way cryptographic transformation of PII (email, phone) into a fixed-length string (SHA-256) before uploading to ad platforms. Ad platforms compare hashes to match users without accessing raw data. Email must be lowercase; phone must be E.164 format (+14155552671). Wrong format = zero match for that field.' },
+    { term: 'ITP', abbr: 'Intelligent Tracking Prevention', platform: 'both', cat: 'Privacy', def: 'Safari\'s browser mechanism (since iOS 11) that limits third-party cookie lifetime to 1–7 days and blocks cross-site tracking. Affects 25–35% of web users. Direct cause of attribution loss in browser-based tracking. Server-side CAPI/Enhanced Conversions bypass ITP.' },
+    { term: 'Lookalike Audiences', abbr: 'LAL', platform: 'meta', cat: 'Targeting', def: 'Meta audiences built by finding users statistically similar to a seed audience (your customer list or pixel visitors). Quality depends heavily on seed size (1,000–50,000 is optimal range) and seed quality (use high-LTV customers as seed). Being replaced by Advantage+ Audience in most use cases.' },
+    { term: 'Lookalike Segments', platform: 'google', cat: 'Targeting', def: 'Google\'s equivalent of Lookalike Audiences — available in Demand Gen campaigns only (not Search/PMax). Replaced Similar Audiences for Demand Gen after August 2023. Seeded from your Customer Match lists or pixel-based remarketing lists.' },
+    { term: 'LTV', abbr: 'Lifetime Value', platform: 'both', cat: 'Bidding', def: 'The total predicted revenue from a customer across their lifetime. Used in Google Ads via Conversion Value Rules to multiply bid signals for high-LTV prospects, and in Meta via Conversion Leads to optimize toward downstream revenue quality rather than lead volume.' },
+    { term: 'Match Rate', platform: 'both', cat: 'Data', def: 'The percentage of uploaded contacts that are successfully matched to users on the ad platform. Target 60%+ for Customer Match (Google) and Custom Audiences (Meta). Below 40% indicates CRM data quality issues. Improved by adding more fields (phone + name on top of email) and proper formatting.' },
+    { term: 'MMM', abbr: 'Media Mix Modeling', platform: 'both', cat: 'Measurement', def: 'Statistical model estimating the contribution of each marketing channel to revenue using historical spend and conversion data. Platform-agnostic and privacy-safe. Used to allocate budgets across channels. First-party data enriches MMM by providing accurate conversion timestamps and values.' },
+    { term: 'MOFU', abbr: 'Middle of Funnel', platform: 'both', cat: 'Strategy', def: 'The consideration stage of the customer journey. Audience strategies here include: re-engaging engaged website visitors, targeting MQLs with nurture content, and applying Custom Audience exclusions to avoid wasting acquisition budget on existing customers.' },
+    { term: 'NCA', abbr: 'New Customer Acquisition', platform: 'google', cat: 'Campaigns', def: 'Google Ads campaign goal that optimizes for acquiring new customers only. Uses Customer Match "All Customers" list as the suppression signal to identify and exclude existing customers. Available in Shopping and Performance Max. Two modes: optimise (bid higher for new) or only (exclude existing entirely).' },
+    { term: 'OCI', abbr: 'Offline Conversion Import', platform: 'google', cat: 'Tracking', def: 'Google\'s feature for importing offline conversion events (store visits, phone sales, CRM-closed deals) back to Google Ads. From September 2025, the conversion_environment parameter (web vs. in-app) is required. Ingested via Data Manager API since December 2025. Closes the loop between ad clicks and offline revenue.' },
+    { term: 'OCAPI', abbr: 'Offline Conversions API', platform: 'meta', cat: 'Tracking', def: 'Meta\'s legacy offline conversion tracking system — fully deprecated May 2025. All offline conversion tracking must migrate to CAPI (Conversions API). Any existing OCAPI pipeline must be rebuilt using CAPI with event_type: "offline".' },
+    { term: 'Optimized Targeting', platform: 'google', cat: 'Targeting', def: 'Google\'s automatic reach expansion for Display and Discovery campaigns. Finds additional users beyond your defined audience segments when it predicts they are likely to convert. Replaced Similar Audiences for these formats after August 2023.' },
+    { term: 'Performance Max', abbr: 'PMax', platform: 'google', cat: 'Campaigns', def: 'Google\'s AI-driven campaign type running across all Google inventory (Search, Display, YouTube, Shopping, Maps, Gmail). Customer Match lists serve as audience signals — not hard targeting. Recommended: 1–2 high-quality signals only. No minimum list size required as of 2025.' },
+    { term: 'Pixel', platform: 'meta', cat: 'Tracking', def: 'Meta\'s JavaScript tracking code (also called Meta Pixel or Facebook Pixel) installed on your website to track page views, events (ViewContent, AddToCart, Purchase), and user behaviour. Hybrid Pixel + CAPI is the 2025 standard. Pixel alone is degraded by ITP, browser ad blockers, and iOS ATT.' },
+    { term: 'Predictive Audiences', platform: 'google', cat: 'Targeting', def: 'GA4-generated audiences based on ML purchase probability and churn probability scores. Threshold lowered to 200+ conversions (from 1,000+) in 2025. Studies show 34–42% higher CVR vs. manually-defined segments. Published to Google Ads via linked Data Manager.' },
+    { term: 'RFM', abbr: 'Recency, Frequency, Monetary', platform: 'both', cat: 'Data', def: 'A customer segmentation model scoring customers on when they last purchased (Recency), how often they buy (Frequency), and how much they spend (Monetary). Used to build tiered CRM audiences: Champions (high R/F/M), Loyal, At-Risk, Hibernating, Lost — each requiring different ad strategies.' },
+    { term: 'RLSA', abbr: 'Remarketing Lists for Search Ads', platform: 'google', cat: 'Targeting', def: 'Google Search campaign feature that adjusts bids or targeting based on whether a searcher is in a remarketing audience. Customer Match lists can be used as RLSA audiences. Bid modifier +30-50% is typical for existing customers searching brand terms.' },
+    { term: 'ROAS', abbr: 'Return on Ad Spend', platform: 'both', cat: 'Measurement', def: 'Revenue divided by ad spend. Target ROAS (tROAS) is a Smart Bidding strategy in Google Ads. In Meta, ROAS is reported in Ads Manager. LTV-based strategies improve reported ROAS by ensuring higher-value customers are prioritised in the bidding process.' },
+    { term: 'Second-Party Data', platform: 'both', cat: 'Data', def: 'Another company\'s first-party data shared directly through a data partnership (not via a broker). Quality varies; shared via data clean rooms or direct API integrations. Intermediate quality between first-party (highest trust) and third-party (lowest).' },
+    { term: 'Segmentation', platform: 'both', cat: 'Data', def: 'Dividing a customer database into groups with shared characteristics (RFM tiers, product category, lifecycle stage, LTV bracket). Each segment gets a different ad strategy: high-LTV gets bid multipliers, at-risk gets win-back creative, new gets acquisition creative.' },
+    { term: 'Server-Side Tracking', platform: 'both', cat: 'Tracking', def: 'Sending conversion and event data from your server directly to ad platforms, bypassing the browser. Bypasses ITP, ad blockers, and browser privacy restrictions. Implemented via Meta CAPI, Google OCI/ECL, or server-side tag containers (GTM server-side). The 2025 standard for reliable measurement.' },
+    { term: 'SHA-256', platform: 'both', cat: 'Privacy', def: 'The cryptographic hash function required by Google and Meta for hashing PII before upload. Produces a 64-character hex string. Email: lowercase, no spaces. Phone: E.164 format (+14155552671). Name: lowercase, no accents. Both platforms accept pre-hashed data or hash on upload via their UIs.' },
+    { term: 'Signal Loss', platform: 'both', cat: 'Measurement', def: 'The degradation of tracking and attribution data caused by privacy changes: iOS ATT, ITP, ETP, cookie deprecation, and consent regulations. 25–35% of iOS users and 40–60% of EU visitors may generate no traceable signal. First-party data strategies are the primary defence.' },
+    { term: 'Smart Bidding', platform: 'google', cat: 'Bidding', def: 'Google\'s AI-driven bid strategies (tCPA, tROAS, Maximize Conversions, Maximize Conversion Value) that adjust bids in real-time per auction using hundreds of signals. Customer Match lists are a key input signal. Manual CPC and Enhanced CPC ignore first-party data entirely — migration to Smart Bidding is a prerequisite.' },
+    { term: 'Suppression', platform: 'both', cat: 'Targeting', def: 'Excluding a known audience (e.g., existing customers) from seeing an ad campaign. Applied to prospecting campaigns to prevent wasting acquisition budget on people who already converted. Built from CRM "All Customers" list uploaded as Customer Match (Google) or Custom Audience (Meta).' },
+    { term: 'tCPA', abbr: 'Target Cost Per Acquisition', platform: 'google', cat: 'Bidding', def: 'Google Smart Bidding strategy that optimizes bids to achieve a target cost-per-conversion. Requires sufficient conversion data (50+ conversions/month recommended). Uses Customer Match and audience signals to find similar users efficiently. Paired with LTV value rules for quality-adjusted targeting.' },
+    { term: 'Third-Party Data', platform: 'both', cat: 'Data', def: 'Aggregated data from external data brokers — demographic overlays, interest segments, behavioural data sold across many buyers. Declining in quality and reliability due to cookie deprecation, GDPR/CCPA enforcement, and browser privacy changes. Not recommended as a primary targeting strategy in 2025+.' },
+    { term: 'TOFU', abbr: 'Top of Funnel', platform: 'both', cat: 'Strategy', def: 'The awareness stage of the customer journey. First-party data is used here for Lookalike/Lookalike Segment prospecting (seeded from high-LTV customers), NCA goal campaigns (Google), and Advantage+ (Meta). The aim is to find new customers who resemble your best existing ones.' },
+    { term: 'tROAS', abbr: 'Target Return on Ad Spend', platform: 'google', cat: 'Bidding', def: 'Google Smart Bidding strategy that optimizes bids to achieve a target revenue/spend ratio. Used for e-commerce when purchase value varies. Combined with LTV Conversion Value Rules to teach the algorithm to prioritise high-value customer acquisition over low-margin transactions.' },
+    { term: 'Value-Based Bidding', abbr: 'VBB', platform: 'both', cat: 'Bidding', def: 'A bidding approach where the conversion value fed to the algorithm reflects true business value (LTV, margin, CLV) rather than a flat conversion count. In Google Ads: tROAS + Conversion Value Rules. In Meta: Value Optimisation with purchase value events. Requires reliable first-party value signals in your CRM.' },
+    { term: 'Zero-Party Data', platform: 'both', cat: 'Data', def: 'Data that users voluntarily and explicitly share with a brand — quiz answers, preference centres, surveys, wishlist data. The highest-trust data type: explicitly consented, intentional, and highly accurate. Collected via on-site tools (preference centres, product quizzes) and stored in CRM.' },
+  ].sort((a, b) => a.term.localeCompare(b.term));
+
+  function renderGlossary(filterLetter = null, filterCat = null, searchQ = '') {
+    renderSidebar(false);
+    document.getElementById('content').classList.remove('narrow');
+
+    const allCats = [...new Set(VOCAB.map(v => v.cat))].sort();
+    const allLetters = [...new Set(VOCAB.map(v => v.term[0].toUpperCase()))].sort();
+
+    const filtered = VOCAB.filter(v => {
+      if (filterLetter && v.term[0].toUpperCase() !== filterLetter) return false;
+      if (filterCat && v.cat !== filterCat) return false;
+      if (searchQ) {
+        const q = searchQ.toLowerCase();
+        return v.term.toLowerCase().includes(q) || v.def.toLowerCase().includes(q);
+      }
+      return true;
+    });
+
+    // Group by letter
+    const groups = {};
+    filtered.forEach(v => {
+      const l = v.term[0].toUpperCase();
+      if (!groups[l]) groups[l] = [];
+      groups[l].push(v);
+    });
+
+    const platBadge = p => p === 'google'
+      ? '<span class="tag tag-google" style="font-size:9px;padding:1px 6px">Google</span>'
+      : p === 'meta'
+      ? '<span class="tag tag-meta" style="font-size:9px;padding:1px 6px">Meta</span>'
+      : '<span class="tag tag-both" style="font-size:9px;padding:1px 6px">Both</span>';
+
+    const hl = t => searchQ
+      ? t.replace(new RegExp(`(${searchQ.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'), '<mark>$1</mark>')
+      : t;
+
+    // Build nav
+    let navHtml = `<div class="glossary-nav-title">A – Z</div><div class="glossary-alpha">`;
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(l => {
+      const has = allLetters.includes(l);
+      const active = filterLetter === l ? 'active' : '';
+      navHtml += `<button class="glossary-alpha-btn ${active}" ${has ? '' : 'disabled'} onclick="FPD.goGlossary('${l}',null)">${l}</button>`;
+    });
+    navHtml += `</div>`;
+    if (filterLetter || filterCat) {
+      navHtml += `<div style="padding:4px 14px 8px"><button onclick="FPD.goGlossary(null,null)" style="font-size:11px;color:#7839EE;background:none;border:none;cursor:pointer;padding:0">✕ Clear filter</button></div>`;
+    }
+    navHtml += `<div class="glossary-cat-filter"><div class="glossary-cat-label">Category</div>`;
+    allCats.forEach(c => {
+      navHtml += `<button class="glossary-cat-btn ${filterCat === c ? 'active' : ''}" onclick="FPD.goGlossary(null,'${c}')">${c}</button>`;
+    });
+    navHtml += `</div>`;
+
+    // Build content
+    let contentHtml = '';
+    if (!filtered.length) {
+      contentHtml = `<div class="glossary-empty">No terms match your filter.</div>`;
+    } else {
+      Object.keys(groups).sort().forEach(l => {
+        const cards = groups[l].map(v => `
+          <div class="glossary-card">
+            <div class="glossary-card-head">
+              <span class="glossary-term">${hl(v.term)}</span>
+              ${v.abbr ? `<span class="glossary-abbr">${v.abbr}</span>` : ''}
+              ${platBadge(v.platform)}
+              <span class="tag" style="background:rgba(0,0,0,0.04);color:rgb(100,100,100);font-size:9px;padding:1px 6px">${v.cat}</span>
+            </div>
+            <div class="glossary-def">${hl(v.def)}</div>
+          </div>`).join('');
+        contentHtml += `<div class="glossary-group" id="gl-${l}">
+          <div class="glossary-letter">${l}</div>
+          <div class="glossary-terms">${cards}</div>
+        </div>`;
+      });
+    }
+
+    document.getElementById('content').innerHTML = `
+      <div class="page-title">Glossary</div>
+      <div class="page-sub">${VOCAB.length} terms — professional vocabulary used throughout this guide.</div>
+      <div class="glossary-layout">
+        <nav class="glossary-nav">${navHtml}</nav>
+        <div>${contentHtml}</div>
+      </div>
+    `;
+    if (filterLetter) setTimeout(() => document.getElementById(`gl-${filterLetter}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+
+  function goGlossary(letter, cat) {
+    state.glossaryLetter = letter;
+    state.glossaryCat = cat;
+    renderGlossary(letter, cat);
+  }
+
   function filterQR(modId) {
     state.qrSection = modId || null;
     // Update nav active state
@@ -1634,7 +1826,7 @@ const FPD = (() => {
   }
 
   // Public API
-  return { init, toggle, goModule, goTab, setFilter, resetAll, tipToggle, filterQR, searchNav, clearSearch };
+  return { init, toggle, goModule, goTab, setFilter, resetAll, tipToggle, filterQR, searchNav, clearSearch, goGlossary };
 
 })();
 
