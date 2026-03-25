@@ -1556,8 +1556,8 @@ const FPD = (() => {
     if (!hits.length) {
       dd.innerHTML = `<div class="search-no-results">No results for "<strong>${query}</strong>"</div>`;
     } else {
-      const iconClass = { learn: 'sri-learn', quickref: 'sri-quickref', checklists: 'sri-checklists' };
-      const iconChar  = { learn: '📖', quickref: '📋', checklists: '✓' };
+      const iconClass = { learn: 'sri-learn', quickref: 'sri-quickref', checklists: 'sri-checklists', glossary: 'sri-learn' };
+      const iconChar  = { learn: '📖', quickref: '📋', checklists: '✓', glossary: '🔤' };
       const platBadge = e => e.platform === 'google'
         ? '<span class="tag tag-google" style="font-size:9px;padding:1px 5px">Google</span>'
         : e.platform === 'meta'
