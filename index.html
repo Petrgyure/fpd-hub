@@ -94,6 +94,49 @@ body {
   min-width: 28px; text-align: center;
 }
 
+/* ===== HEADER: SEARCH ===== */
+.search-wrap { position: relative; flex-shrink: 0; }
+.search-input {
+  width: 220px; height: 32px; padding: 0 12px 0 34px;
+  border: 1.25px solid rgba(0,0,0,0.12); border-radius: 8px;
+  font-size: 13px; font-family: inherit; background: rgb(247,247,250);
+  color: #000; outline: none; transition: all 0.15s;
+}
+.search-input:focus { border-color: #7839EE; background: #fff; width: 280px; box-shadow: 0 0 0 3px rgba(120,57,238,0.08); }
+.search-input::placeholder { color: rgb(180,180,180); }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: rgb(154,154,154); font-size: 13px; }
+.search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: rgb(154,154,154); font-size: 14px; padding: 2px; display: none; }
+.search-clear.visible { display: block; }
+.search-dropdown {
+  position: absolute; top: calc(100% + 6px); right: 0; min-width: 360px;
+  background: #fff; border-radius: 12px; border: 1.25px solid rgba(0,0,0,0.1);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12); z-index: 9999;
+  max-height: 480px; overflow-y: auto; display: none;
+}
+.search-dropdown.open { display: block; }
+.search-result {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 14px; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.05);
+  transition: background 0.1s;
+}
+.search-result:last-child { border-bottom: none; }
+.search-result:hover, .search-result.focused { background: rgb(247,247,250); }
+.search-result-icon { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+.sri-learn { background: rgba(120,57,238,0.08); color: #7839EE; }
+.sri-quickref { background: rgba(16,185,129,0.08); color: #10B981; }
+.sri-checklists { background: rgba(245,158,11,0.08); color: #F59E0B; }
+.search-result-body { flex: 1; min-width: 0; }
+.search-result-title { font-size: 13px; font-weight: 600; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-result-title mark { background: rgba(120,57,238,0.15); color: #7839EE; border-radius: 2px; padding: 0 2px; font-weight: 700; }
+.search-result-meta { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.search-result-crumb { font-size: 11px; color: rgb(154,154,154); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-result-snippet { font-size: 11.5px; color: rgb(100,100,100); margin-top: 3px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.search-result-snippet mark { background: rgba(120,57,238,0.1); color: #7839EE; border-radius: 2px; padding: 0 1px; }
+.search-no-results { padding: 20px 14px; text-align: center; font-size: 13px; color: rgb(154,154,154); }
+.search-footer { padding: 7px 14px; background: rgb(247,247,250); border-top: 1px solid rgba(0,0,0,0.06); display: flex; gap: 12px; }
+.search-footer-hint { font-size: 10.5px; color: rgb(154,154,154); display: flex; align-items: center; gap: 4px; }
+.search-kbd { background: #fff; border: 1px solid rgba(0,0,0,0.15); border-radius: 3px; padding: 1px 4px; font-size: 10px; font-family: inherit; }
+
 /* ===== HEADER: FILTERS ===== */
 .header-filters { display: flex; gap: 14px; margin-left: 4px; align-items: center; }
 .filter-group { display: flex; align-items: center; gap: 5px; }
@@ -482,8 +525,16 @@ body.pf-meta   .sidebar-item[data-platform="google"] { display: none; }
       <button class="tab-btn" data-tab="progress">My Progress <span class="tab-badge" id="apex-badge">0%</span></button>
     </nav>
 
+    <!-- Search -->
+    <div class="search-wrap" id="search-wrap" style="margin-left:auto">
+      <span class="search-icon">⌕</span>
+      <input class="search-input" id="search-input" type="text" placeholder="Search sections…" autocomplete="off">
+      <button class="search-clear" id="search-clear" onclick="FPD.clearSearch()">✕</button>
+      <div class="search-dropdown" id="search-dropdown"></div>
+    </div>
+
     <!-- Filters -->
-    <div class="header-filters">
+    <div class="header-filters" style="margin-left:0">
       <div class="filter-group">
         <span class="filter-label">Platform</span>
         <button class="filter-btn active" data-filter="platform" data-value="all">All</button>
@@ -1404,6 +1455,8 @@ const FPD = (() => {
 
     // Parse
     parsed = parseDocument(mdText);
+    buildSearchIndex();
+    initSearch();
 
     // Show app
     document.getElementById('loading').style.display = 'none';
@@ -1411,6 +1464,157 @@ const FPD = (() => {
 
     // Initial render
     goTab('learn');
+  }
+
+  // ── SEARCH ────────────────────────────────────────────────
+  let searchIdx = [];
+  let searchFocusIdx = -1;
+
+  function stripMd(raw) {
+    return raw
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/#{1,6}\s+/g, '')
+      .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
+      .replace(/`[^`]+`/g, '')
+      .replace(/\|[^\n]+/g, ' ')
+      .replace(/[-*+]\s+\[[ x]\]\s*/g, '')
+      .replace(/[-*+]\s+/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/\s+/g, ' ').trim().slice(0, 300);
+  }
+
+  function buildSearchIndex() {
+    searchIdx = [];
+    parsed.modules.forEach(m => {
+      m.sections.forEach(s => {
+        const body = stripMd(s.raw);
+        const base = { moduleId: m.id, sectionId: s.id, platform: m.track || null, body, moduleName: m.title };
+        // Always indexable in Learn
+        searchIdx.push({ ...base, tab: 'learn', tabLabel: 'Learn', title: sectionTitle(s.id) });
+        // Also in Quick Reference
+        if (s.quick_reference) searchIdx.push({ ...base, tab: 'quickref', tabLabel: 'Quick Ref', title: sectionTitle(s.id) });
+        // Also in Checklists
+        if (s.checklist && !s.apex) searchIdx.push({ ...base, tab: 'checklists', tabLabel: 'Checklist', title: sectionTitle(s.id) });
+      });
+    });
+  }
+
+  function highlight(text, query) {
+    if (!query) return text;
+    const esc = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return text.replace(new RegExp(`(${esc})`, 'gi'), '<mark>$1</mark>');
+  }
+
+  function runSearch(query) {
+    const dd = document.getElementById('search-dropdown');
+    const clr = document.getElementById('search-clear');
+    clr.classList.toggle('visible', query.length > 0);
+    if (query.length < 2) { dd.classList.remove('open'); return; }
+
+    const q = query.toLowerCase();
+    const hits = searchIdx.filter(e =>
+      e.title.toLowerCase().includes(q) || e.body.toLowerCase().includes(q)
+    ).slice(0, 8);
+
+    searchFocusIdx = -1;
+    if (!hits.length) {
+      dd.innerHTML = `<div class="search-no-results">No results for "<strong>${query}</strong>"</div>`;
+    } else {
+      const iconClass = { learn: 'sri-learn', quickref: 'sri-quickref', checklists: 'sri-checklists' };
+      const iconChar  = { learn: '📖', quickref: '📋', checklists: '✓' };
+      const platBadge = e => e.platform === 'google'
+        ? '<span class="tag tag-google" style="font-size:9px;padding:1px 5px">Google</span>'
+        : e.platform === 'meta'
+        ? '<span class="tag tag-meta" style="font-size:9px;padding:1px 5px">Meta</span>'
+        : '';
+
+      const items = hits.map((e, i) => {
+        const snippet = (() => {
+          const idx = e.body.toLowerCase().indexOf(q);
+          const start = Math.max(0, idx - 40);
+          const raw = (start > 0 ? '…' : '') + e.body.slice(start, start + 120) + (start + 120 < e.body.length ? '…' : '');
+          return highlight(raw, query);
+        })();
+        return `
+          <div class="search-result" data-idx="${i}" onclick="FPD.searchNav(${i})">
+            <div class="search-result-icon ${iconClass[e.tab]}">${iconChar[e.tab]}</div>
+            <div class="search-result-body">
+              <div class="search-result-title">${highlight(e.title, query)}</div>
+              <div class="search-result-meta">
+                <span class="search-result-crumb">${e.tabLabel} › ${e.moduleName}</span>
+                ${platBadge(e)}
+              </div>
+              ${snippet ? `<div class="search-result-snippet">${snippet}</div>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+      dd.innerHTML = items + `
+        <div class="search-footer">
+          <span class="search-footer-hint"><kbd class="search-kbd">↑↓</kbd> navigate</span>
+          <span class="search-footer-hint"><kbd class="search-kbd">↵</kbd> open</span>
+          <span class="search-footer-hint"><kbd class="search-kbd">Esc</kbd> close</span>
+        </div>`;
+    }
+    dd.classList.add('open');
+  }
+
+  function searchNav(idx) {
+    const e = searchIdx.filter(x => {
+      const q = document.getElementById('search-input').value.toLowerCase();
+      return x.title.toLowerCase().includes(q) || x.body.toLowerCase().includes(q);
+    })[idx];
+    if (!e) return;
+    closeSearch();
+    if (e.tab === 'learn') {
+      goTab('learn'); goModule(e.moduleId);
+      setTimeout(() => document.getElementById(`sec-${e.sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+    } else if (e.tab === 'quickref') {
+      goTab('quickref');
+      setTimeout(() => { filterQR(e.moduleId); document.getElementById(`qrg-${e.moduleId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 120);
+    } else if (e.tab === 'checklists') {
+      goTab('checklists');
+      setTimeout(() => document.getElementById(`clg-${e.moduleId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+    }
+  }
+
+  function closeSearch() {
+    document.getElementById('search-dropdown').classList.remove('open');
+    document.getElementById('search-input').blur();
+  }
+
+  function clearSearch() {
+    const inp = document.getElementById('search-input');
+    inp.value = '';
+    document.getElementById('search-clear').classList.remove('visible');
+    document.getElementById('search-dropdown').classList.remove('open');
+    inp.focus();
+  }
+
+  function initSearch() {
+    const inp = document.getElementById('search-input');
+    inp.addEventListener('input', e => runSearch(e.target.value.trim()));
+    inp.addEventListener('keydown', e => {
+      const dd = document.getElementById('search-dropdown');
+      const items = dd.querySelectorAll('.search-result');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        searchFocusIdx = Math.min(searchFocusIdx + 1, items.length - 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        searchFocusIdx = Math.max(searchFocusIdx - 1, 0);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (searchFocusIdx >= 0) searchNav(searchFocusIdx);
+        else if (items.length) searchNav(0);
+        return;
+      } else if (e.key === 'Escape') {
+        closeSearch(); return;
+      } else { return; }
+      items.forEach((el, i) => el.classList.toggle('focused', i === searchFocusIdx));
+    });
+    document.addEventListener('click', e => {
+      if (!document.getElementById('search-wrap').contains(e.target)) closeSearch();
+    });
   }
 
   function filterQR(modId) {
@@ -1430,7 +1634,7 @@ const FPD = (() => {
   }
 
   // Public API
-  return { init, toggle, goModule, goTab, setFilter, resetAll, tipToggle, filterQR };
+  return { init, toggle, goModule, goTab, setFilter, resetAll, tipToggle, filterQR, searchNav, clearSearch };
 
 })();
 
