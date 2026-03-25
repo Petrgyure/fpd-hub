@@ -235,7 +235,12 @@ body.mf-ecommerce .track-filter[data-track="leadgen"]   { display: none; }
 body.mf-leadgen   .track-filter[data-track="ecommerce"] { display: none; }
 
 /* ===== QUICK REFERENCE ===== */
-.qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 18px; }
+.qr-layout { display: grid; grid-template-columns: 200px 1fr; gap: 24px; align-items: start; }
+.qr-group { margin-bottom: 36px; }
+.qr-group-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1.5px solid rgba(0,0,0,0.07); }
+.qr-group-title { font-size: 15px; font-weight: 600; color: #000; letter-spacing: -0.01em; }
+.qr-group-count { font-size: 11px; color: rgb(154,154,154); font-weight: 600; margin-left: auto; }
+.qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
 .qr-card {
   background: #fff; border-radius: 16px;
   border: 1.25px solid rgba(0,0,0,0.08);
@@ -831,25 +836,63 @@ const FPD = (() => {
     renderSidebar(false);
     document.getElementById('content').classList.remove('narrow');
 
-    const qrSections = [];
+    // Group QR sections by module
+    const groups = [];
     parsed.modules.forEach(m => {
-      m.sections.filter(s => s.quick_reference).forEach(s => qrSections.push({ ...s, moduleName: m.title }));
+      const secs = m.sections.filter(s => s.quick_reference);
+      if (!secs.length) return;
+      groups.push({ m, secs });
     });
 
-    let cards = '';
-    qrSections.forEach(s => {
-      const bodyHtml = mdToHtml(s.raw, s.id);
-      const mod = parsed.modules.find(m => m.sections.some(sec => sec.id === s.id));
-      const badges = platformBadges(mod, s);
-      const trackAttr = mod && mod.track ? ` class="track-filter" data-track="${mod.track}"` : '';
-      cards += `
+    // Build nav
+    let navHtml = `<div class="cl-nav-title">Sections</div>`;
+    groups.forEach(({ m, secs }) => {
+      const badge = m.track === 'google'
+        ? '<span class="tag tag-google" style="font-size:9px;padding:1px 6px">Google</span>'
+        : m.track === 'meta'
+        ? '<span class="tag tag-meta" style="font-size:9px;padding:1px 6px">Meta</span>'
+        : '';
+      const trackAttr = m.track ? ` class="track-filter" data-track="${m.track}"` : '';
+      navHtml += `
         <div${trackAttr}>
+          <a class="cl-nav-item" onclick="document.getElementById('qrg-${m.id}')?.scrollIntoView({behavior:'smooth',block:'start'})">
+            <span class="cl-nav-item-label">${m.title}</span>
+            <span class="cl-nav-item-meta">
+              ${badge}
+              <span class="cl-nav-count">${secs.length} table${secs.length > 1 ? 's' : ''}</span>
+            </span>
+          </a>
+        </div>`;
+    });
+
+    // Build grouped content
+    let contentHtml = '';
+    groups.forEach(({ m, secs }) => {
+      let cards = '';
+      secs.forEach(s => {
+        const bodyHtml = mdToHtml(s.raw, s.id);
+        const secBadges = platformBadges(m, s);
+        cards += `
           <div class="qr-card">
             <div class="qr-card-head">
               <span class="qr-card-title">${sectionTitle(s.id)}</span>
-              ${badges || `<span class="tag tag-both">${s.moduleName}</span>`}
+              ${secBadges}
             </div>
             <div class="qr-card-body mc">${bodyHtml}</div>
+          </div>`;
+      });
+
+      const modBadges = platformBadges(m, null);
+      const trackAttr = m.track ? ` class="track-filter" data-track="${m.track}"` : '';
+      contentHtml += `
+        <div${trackAttr}>
+          <div class="qr-group" id="qrg-${m.id}">
+            <div class="qr-group-head">
+              <span class="qr-group-title">${m.title}</span>
+              ${modBadges}
+              <span class="qr-group-count">${secs.length} reference${secs.length > 1 ? 's' : ''}</span>
+            </div>
+            <div class="qr-grid">${cards}</div>
           </div>
         </div>`;
     });
@@ -857,7 +900,10 @@ const FPD = (() => {
     document.getElementById('content').innerHTML = `
       <div class="page-title">Quick Reference</div>
       <div class="page-sub">Key tables, benchmarks, and specs — filtered by your active platform/model settings.</div>
-      <div class="qr-grid">${cards}</div>
+      <div class="qr-layout">
+        <nav class="cl-nav">${navHtml}</nav>
+        <div>${contentHtml}</div>
+      </div>
     `;
     applyFilter();
   }
