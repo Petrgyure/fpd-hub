@@ -256,6 +256,83 @@ RFM scores each customer on three dimensions: Recency (days since last purchase)
 
 ---
 
+<!-- section: crm_integration_patterns | quick_reference: true -->
+
+### 1.8 CRM Integration Patterns
+
+How to connect your CRM to ad platforms for first-party data activation. The right integration method depends on your CRM, technical resources, and update frequency needs.
+
+#### Integration Methods by CRM
+
+| CRM | Google Ads Integration | Meta Ads Integration | Automation Level | Setup Effort |
+|-----|----------------------|---------------------|-----------------|-------------|
+| **HubSpot** | Native Data Manager connector (automatic sync); HubSpot Workflows → Google Customer Match lists | Native CAPI integration (HubSpot Operations Hub); Custom Audiences via HubSpot Lists sync | High — bidirectional sync available | Low–Medium |
+| **Salesforce** | Google Data Manager connector (via Salesforce Marketing Cloud or direct); Zapier/LeadsBridge for simple lists | Meta CAPI via Salesforce Marketing Cloud or Zapier; Custom Audience upload via Data Connector | High with Marketing Cloud; Medium without | Medium–High |
+| **Klaviyo** | Google Customer Match via native integration (automatic segment sync); Shopify → Klaviyo → Google pipeline | Meta Custom Audiences via native Klaviyo integration; Segment sync for Lookalike seeding | High — real-time for e-commerce | Low |
+| **Pipedrive** | No native Google integration — use Zapier/Make or CSV export | Meta Lead Ads native sync (inbound only); CAPI via Zapier/Make for conversions | Low–Medium | Medium |
+| **Generic / Custom CRM** | Google Ads API (Data Manager) — scheduled uploads via script or iPaaS | CAPI via webhook (Zapier/Make/n8n) or custom server-side integration | Variable — depends on implementation | High |
+
+#### Key Integration Patterns
+
+**Pattern 1: Automated list sync (recommended)**
+CRM segment → iPaaS (Zapier/Make/n8n) → Google Customer Match + Meta Custom Audience upload. Schedule: daily or on-segment-change trigger. Best for: suppression lists, remarketing lists, high-value customer segments.
+
+**Pattern 2: Conversion feedback loop**
+CRM qualification event (MQL → SQL → Closed-Won) → CAPI/OCI → Platform optimization. Essential for lead gen businesses. The platform needs to know which leads became customers to optimize bidding.
+
+**Pattern 3: Manual CSV export**
+CRM → Export CSV → Upload via Google Data Manager UI / Meta Business Manager. Suitable for: monthly refresh, small teams, <10K records. Not recommended for audiences that change frequently.
+
+> 🎯 The most impactful integration to build first is the **conversion feedback loop** (Pattern 2). Match rate improvements from list sync are incremental; conversion signal quality improvements from feeding back CRM outcomes directly improve Smart Bidding and Conversion Leads optimization.
+
+#### gclid / fbclid Capture
+
+For the conversion feedback loop to work, you must capture the click identifier from ad platforms:
+
+- **gclid (Google):** Append `?gclid={gclid}` auto-tagging (enabled by default). Capture via hidden form field on landing page, store in CRM with the lead record. Required for OCI.
+- **fbclid (Meta):** Appended automatically to URLs from Meta ads. Capture from URL parameter on landing, store in first-party cookie `_fbc` and in CRM. Required for high EMQ scores.
+
+Both identifiers expire: gclid after 90 days, fbclid is used for attribution within the click-through window (default 7 days, configurable up to 28 days).
+
+---
+
+<!-- section: server_side_tracking -->
+
+### 1.9 Server-Side Tracking Architecture
+
+Server-side tracking moves event collection from the browser to your server, improving data quality and reducing signal loss from ad blockers and ITP.
+
+#### Why Server-Side?
+
+| Challenge | Client-Side Only | With Server-Side |
+|-----------|-----------------|-----------------|
+| Ad blocker rate | 25–40% of users blocked | 0% — events sent server-to-server |
+| ITP cookie lifetime | 7 days (Safari) | First-party server-set cookies persist longer |
+| Data quality | Browser-dependent, inconsistent | Full control over payload quality |
+| CAPI/ECL requirement | Partial (browser-only) | Required for Meta CAPI, enhances Google ECL |
+
+#### Architecture Options
+
+**Option 1: GTM Server-Side Container (most common)**
+Browser GTM → Cloud Run/Cloud Functions (GTM SS) → Google Ads, Meta CAPI, GA4. Cost: $30–100/month for hosting. Setup: 2–4 hours for basic, 1–2 days for production-ready with debugging.
+
+**Option 2: Customer Data Platform (CDP)**
+Segment, Rudderstack, or mParticle. Browser SDK → CDP → all platform APIs. Cost: $120+/month. Best for: multi-platform enterprises needing real-time event routing.
+
+**Option 3: Custom server integration**
+Your backend → direct API calls to Google/Meta/LinkedIn. Cost: development time only. Best for: teams with engineering resources who want full control.
+
+> ⚠️ Server-side tracking is not a replacement for consent. You still need user consent for tracking under GDPR/CCPA. Server-side just ensures that consented events are captured reliably.
+
+#### Debugging Server-Side Events
+
+- **GTM Server-Side Preview Mode:** Test events in real-time before deploying
+- **Meta Test Events:** Events Manager → Test Events → enter your test event code
+- **Google Tag Assistant:** Verify enhanced conversions and conversion tags fire correctly
+- **Network inspection:** Check your server logs for outbound API calls to platform endpoints
+
+---
+
 <!-- module: google_implementation | track: google -->
 
 ## Module 2: Google Ads Implementation
@@ -640,6 +717,58 @@ Track your progress toward full first-party data potential on Google Ads. Comple
 
 ---
 
+<!-- section: google_troubleshooting | checklist: true -->
+
+### 2.16 Google Ads — Troubleshooting Guide
+
+When first-party data setups don't perform as expected, use these diagnostic workflows.
+
+#### Low Match Rates (below 30%)
+
+| Symptom | Likely Cause | Fix |
+|---------|-------------|-----|
+| Match rate under 20% | Email-only list, no phone/address | Add phone numbers (E.164) and mailing address — each identifier increases match probability independently |
+| Match rate dropped after upload | Formatting errors introduced | Verify: all emails lowercase, no whitespace, phone numbers include country code (+1, +44), SHA-256 hash if pre-hashed |
+| "Processing" status stuck >48 hrs | List too small or format error | Minimum ~1,000 records for processing; check Data Manager error log for specific row-level failures |
+| Rate high but audience small | De-duplication removed records | Check for duplicate emails/phones in source CRM export |
+
+> ⚠️ Google matches against Google account emails, not third-party providers. B2B lists with corporate emails typically see 25–40% match rates; consumer lists with Gmail addresses see 50–70%.
+
+#### Customer Match Not Working
+
+- [ ] Verify account has $50K+ lifetime spend (Settings → Account information)
+- [ ] Check for active policy violations (Notifications → Policy Manager)
+- [ ] Confirm Data Manager upload shows "Active" status, not "Failed" or "Processing"
+- [ ] Verify audience is applied to the correct campaign in Targeting (not just Observation)
+- [ ] Check audience membership duration hasn't expired (540-day maximum)
+
+#### OCI Upload Failures
+
+- [ ] `conversion_environment` field included (required since September 2025) — value: `WEB` or `APP`
+- [ ] `gclid` is valid and not older than 90 days
+- [ ] Conversion action name in upload matches exactly (case-sensitive) the Google Ads conversion action
+- [ ] Upload timestamp is within the conversion window defined in conversion action settings
+- [ ] No duplicate `gclid` + `conversion_datetime` combinations in the same batch
+- [ ] For Google Ads API uploads: verify `customer_id` matches the account that owns the conversion action, not the MCC
+
+> 🎯 Test OCI with a single known conversion first. Find a recent lead in your CRM that converted, locate its gclid, and upload manually. If this works, the pipeline is correctly configured.
+
+#### ECL (Enhanced Conversions for Leads) Not Registering
+
+- [ ] Tag Assistant shows the `enhanced_conversion_data` parameter firing on the lead form submission tag
+- [ ] The hashed email in ECL matches what your CRM later sends via OCI
+- [ ] GTM trigger fires on the thank-you page or form submit event — not on page load
+- [ ] ECL is enabled at account level (Conversions → Settings → Enhanced conversions)
+
+#### Smart Bidding Not Using Audience Signals
+
+- [ ] Confirm audience is in **Targeting** mode, not just Observation
+- [ ] Verify campaign is not using Manual CPC or Maximize Clicks — audience signals only work with value-based or conversion-based bidding
+- [ ] Check that the audience has >1,000 members (below this, Google may not use it as a signal)
+- [ ] Allow 2–4 weeks for Smart Bidding to incorporate new audience data after a change
+
+---
+
 <!-- module: meta_implementation | track: meta -->
 
 ## Module 3: Meta Ads Implementation
@@ -953,6 +1082,61 @@ Track your progress toward full first-party data potential on Meta Ads.
 
 ---
 
+<!-- section: meta_troubleshooting | checklist: true -->
+
+### 3.10 Meta Ads — Troubleshooting Guide
+
+Diagnostic workflows for common Meta first-party data issues.
+
+#### EMQ (Event Match Quality) Below 7
+
+| Parameter Missing | Impact | Fix |
+|------------------|--------|-----|
+| No email in CAPI payload | EMQ drops 2–3 points | Pass `em` (hashed email) in `user_data` on every server event |
+| No phone number | EMQ drops 1–1.5 points | Pass `ph` (E.164, hashed) alongside email |
+| No `fbclid` / `fbc` cookie | EMQ drops 1–2 points | Capture `fbclid` from URL on landing, store in first-party cookie `_fbc`, pass in CAPI `user_data.fbc` |
+| No `fbp` cookie | EMQ drops 0.5–1 point | Ensure Pixel fires PageView (generates `_fbp`), pass in CAPI `user_data.fbp` |
+| Missing `client_ip_address` / `client_user_agent` | EMQ drops 1–2 points | Capture from request headers server-side and include in CAPI payload |
+
+> ⚠️ EMQ above 8.5 has diminishing returns. Focus on getting Purchase events to 7.5+ and Lead events to 6.5+. Don't add fake data to inflate the score — Meta penalizes low-quality matches.
+
+#### CAPI Events Not Appearing in Events Manager
+
+- [ ] Verify Pixel ID in CAPI payload matches the Pixel assigned to your Business Manager
+- [ ] Check access token hasn't expired — regenerate from Events Manager → Settings → Generate Access Token
+- [ ] `event_time` must be a Unix timestamp in seconds (not milliseconds) and within the last 7 days
+- [ ] `action_source` is required — use `website` for web events, `email` for CRM, `system_generated` for automated flows
+- [ ] Test events using the Events Manager Test Events tab with your server's test event code
+- [ ] For GTM Server-Side: verify the Meta CAPI tag has the correct API version (v18.0+ recommended)
+
+#### Deduplication Failures (Events Double-Counted)
+
+- [ ] Both Pixel and CAPI events must send the same `event_id` for the same user action
+- [ ] `event_id` must be a unique string per event occurrence (UUID recommended) — do NOT reuse the same ID across different events
+- [ ] `event_name` must match exactly between Pixel and CAPI (e.g., both `Purchase`, not `purchase` vs `Purchase`)
+- [ ] Events must occur within 48 hours of each other to be deduplicated
+- [ ] In Events Manager → Overview → "Deduplication" column: check that browser+server events show merged, not separate counts
+
+> 🎯 Quick deduplication test: fire a test Purchase via Pixel and CAPI with the same `event_id`. In Events Manager → Test Events, you should see 1 event (deduplicated), not 2.
+
+#### Custom Audience "Too Small" or Low Match Rate
+
+- [ ] Minimum 100 contacts required, but Meta recommends 1,000+ for meaningful audience creation
+- [ ] Check identifier quality: email-only lists typically see 30–50% match; adding phone improves to 50–70%
+- [ ] Verify SHA-256 hashing is applied before upload (Meta hashes automatically if using UI upload, but API/partner uploads may need pre-hashing)
+- [ ] Custom Audience ToS must be accepted by the Business Manager admin
+- [ ] Audience retention is 180 days — if your list hasn't been refreshed, contacts may have expired
+
+#### Conversion Leads Not Optimizing
+
+- [ ] Verify Meta Lead ID (15–16 digit number) is captured from the lead form and stored in your CRM
+- [ ] CRM conversion events must be sent back to Meta via CAPI with `action_source: "system_generated"` and the original `lead_id` in the payload
+- [ ] Allow 30+ days and 50+ conversions for Conversion Leads optimization to exit learning phase
+- [ ] Check that the conversion event (e.g., `lead_qualified`, `purchase`) is set as the optimization event at the ad set level
+- [ ] Conversion Leads requires the Meta Lead Ads objective — it doesn't work with website conversion campaigns
+
+---
+
 <!-- module: measurement -->
 
 ## Module 4: Measurement & Incrementality
@@ -1030,6 +1214,66 @@ MMM uses statistical modeling to attribute revenue to marketing inputs across ch
 > 🎯 MMM and incrementality testing are complements, not substitutes. MMM tells you budget allocation at a macro level over time. Lift tests validate specific decisions (does Customer Match actually help?) in the short term. Use both.
 
 **Practical note for PPC specialists:** You don't need to run MMM yourself. Your job is to ensure the inputs exist: clean CRM revenue data, OCI/CAPI-backed offline conversions, and a promotional calendar. Without clean first-party data flowing into the business, MMM inputs are unreliable.
+
+---
+
+<!-- section: data_clean_rooms -->
+
+### 4.4 Data Clean Rooms
+
+A data clean room is a privacy-safe environment where two parties can combine their data for analysis without either party seeing the other's raw records.
+
+#### Why Clean Rooms Matter for First-Party Data
+
+As third-party cookies disappear, clean rooms let you:
+- Measure cross-publisher reach and frequency without relying on cookie-based tracking
+- Analyze audience overlap between your CRM and a publisher's audience
+- Run attribution analysis across walled gardens (Google, Meta) without exposing PII
+
+#### Platform Clean Rooms
+
+| Clean Room | Provider | Use Case | Access |
+|-----------|----------|----------|--------|
+| **Google Ads Data Hub** | Google | Query Google ad data joined with your first-party data in BigQuery — privacy-preserving aggregate queries only | Requires BigQuery + Google Ads API access |
+| **Meta Advanced Analytics** | Meta | Aggregate analysis of first-party data matched against Meta's ad delivery data. 27x performance variation found from segmentation insights | Meta Business Manager, limited availability |
+| **AWS Clean Rooms** | AWS | Multi-party data collaboration with configurable privacy controls. Platform-agnostic | AWS account, enterprise use |
+| **Snowflake Data Clean Room** | Snowflake | SQL-based clean room for cross-organization data analysis | Snowflake account, enterprise use |
+
+> 🎯 For most PPC specialists: clean rooms are a stakeholder/analyst tool, not a day-to-day PPC tool. Your role is to ensure your first-party data is clean enough to be useful in clean room analysis. The outputs (audience insights, attribution data) inform your targeting and bidding strategy.
+
+---
+
+<!-- section: identity_resolution -->
+
+### 4.5 Identity Resolution and Data Unification
+
+Identity resolution is the process of connecting multiple data points to a single person. It directly impacts your match rates across all ad platforms.
+
+#### Deterministic vs. Probabilistic Matching
+
+| Method | How It Works | Match Rate | Accuracy |
+|--------|-------------|-----------|----------|
+| **Deterministic** | Exact identifier match (email, phone) | Lower but precise | 99%+ |
+| **Probabilistic** | Statistical inference from signals (device, IP, behavior) | Higher but fuzzy | 70–85% |
+
+Ad platforms use **deterministic matching** for Customer Match and Custom Audiences — they match your hashed email/phone against their user database. Your match rate is limited by the quality and coverage of identifiers in your CRM.
+
+#### Improving Match Rates Through Identity Resolution
+
+1. **Collect multiple identifiers at every touchpoint:** Email is baseline. Add phone number to lead forms. Capture mailing address for e-commerce. Each additional identifier improves match probability.
+2. **Unify across systems:** If a customer exists in your CRM, email tool, and e-commerce platform under slightly different records, merge them. Duplicate records = missed matches.
+3. **Normalize consistently:** Apply E.164 phone format, lowercase email, and trim whitespace before hashing. This seems obvious but accounts for >50% of match rate issues.
+
+#### CDPs (Customer Data Platforms) for Identity Resolution
+
+| CDP | Best For | Key Feature |
+|-----|---------|-------------|
+| **Segment** | Engineering-oriented teams | Real-time event routing + identity graph |
+| **Rudderstack** | Open-source/self-hosted preference | Warehouse-native, no vendor lock-in |
+| **mParticle** | Enterprise multi-platform | Advanced identity resolution + audience syndication |
+| **Bloomreach** | E-commerce | Pre-built e-commerce customer profiles |
+
+> ⚠️ A CDP is not required for first-party data success. If you have a single CRM with clean data and <50K contacts, direct integrations (Section 1.8) are more cost-effective. CDPs become valuable at scale (100K+ contacts, 3+ platforms, real-time requirements).
 
 ---
 
@@ -1273,9 +1517,44 @@ Campaign (Target ROAS)
 
 ---
 
+<!-- section: cross_platform_sync -->
+
+### 5.7 Cross-Platform Audience Syncing
+
+When running ads across Google, Meta, and other platforms simultaneously, your first-party data strategy must be unified — not siloed per platform.
+
+#### The Unified Suppression Rule
+
+If someone is on your "All Customers" suppression list, they must be suppressed on **every platform**. Otherwise, you'll pay to re-acquire existing customers on whichever platform you forgot to exclude them from.
+
+| List Type | Google | Meta | LinkedIn | Frequency |
+|-----------|--------|------|----------|-----------|
+| All Customers (suppression) | Customer Match → Exclusion | Custom Audience → Exclude | Contact List → Exclude | Weekly |
+| High-Value / Champions | Customer Match → Targeting + Value Rules | Custom Audience → LAL seed | Contact List → LAL seed | Weekly |
+| Recent Converters (30 days) | Customer Match → Exclusion | Custom Audience → Exclude | Contact List → Exclude | Daily if possible |
+| Newsletter Subscribers | Customer Match → Observation | Custom Audience → Targeting for upsell | N/A | Weekly |
+
+#### Automation Pattern
+
+**Single source → multiple destinations:**
+```
+CRM Segment → Zapier/Make/n8n trigger
+   ├── Google Customer Match (via Data Manager API)
+   ├── Meta Custom Audience (via Marketing API)
+   └── LinkedIn Matched Audience (via Marketing API)
+```
+
+**Naming convention:** Use the same audience name across platforms for sanity: `fpd_all_customers_suppression`, `fpd_high_value_lal_seed`, `fpd_recent_30d_exclude`. Prefix with `fpd_` so you can instantly identify first-party data audiences in any platform.
+
+**Refresh cadence:** All platforms should update on the same schedule. Staggered updates create windows where one platform suppresses a customer but another doesn't.
+
+> 🎯 The most common cross-platform failure: running a "New Customer" acquisition campaign on Google with Customer Match suppression, but forgetting Meta — where the same existing customers see your ads and cost you money.
+
+---
+
 <!-- section: google_best_practices | quick_reference: false -->
 
-### 5.7 Google Ads — Best Practices by Campaign Type
+### 5.8 Google Ads — Best Practices by Campaign Type
 
 #### Search (RLSA)
 
@@ -1312,7 +1591,7 @@ RLSA (Remarketing Lists for Search Ads) applies your Customer Match lists to Sea
 
 <!-- section: meta_best_practices | quick_reference: false -->
 
-### 5.8 Meta Ads — Best Practices by Campaign Type
+### 5.9 Meta Ads — Best Practices by Campaign Type
 
 #### Acquisition Campaigns
 
@@ -1360,7 +1639,7 @@ The goal: bring back people who showed interest but didn't convert, or upsell pe
 
 <!-- section: strategy_decision_matrix | quick_reference: true -->
 
-### 5.9 Strategy Decision Matrix
+### 5.10 Strategy Decision Matrix
 
 Use this table to decide what to do with any segment.
 
@@ -1381,7 +1660,7 @@ Use this table to decide what to do with any segment.
 
 <!-- section: common_mistakes -->
 
-### 5.10 Top 12 Mistakes Beginners Make
+### 5.11 Top 12 Mistakes Beginners Make
 
 Learning from these mistakes before making them will save months of wasted budget and corrupted algorithm training.
 
@@ -1494,7 +1773,7 @@ Uploading customer data without verifying consent status is not just a complianc
 
 <!-- section: mental_models -->
 
-### 5.11 The Mental Models That Make Everything Click
+### 5.12 The Mental Models That Make Everything Click
 
 If you take only three things from this module, make it these:
 
