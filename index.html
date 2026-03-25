@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>First-Party Data Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: rgb(247,247,250);
+  color: #000000;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== LAYOUT ===== */
+.app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.header {
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 20px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+.body-layout { display: flex; flex: 1; overflow: hidden; }
+.sidebar {
+  width: 256px;
+  background: #FFFFFF;
+  border-right: 1px solid rgba(0,0,0,0.08);
+  overflow-y: auto;
+  flex-shrink: 0;
+  padding: 12px 0 24px;
+  transition: width 0.2s;
+}
+.sidebar.hidden { width: 0; overflow: hidden; padding: 0; }
+.content-wrap { flex: 1; overflow-y: auto; display: flex; justify-content: flex-start; }
+.content { padding: 32px 36px; width: 100%; }
+.content.narrow { max-width: 840px; }
+
+/* ===== SCROLLBARS ===== */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+
+/* ===== HEADER: LOGO ===== */
+.logo { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.logo-mark {
+  width: 30px; height: 30px;
+  background: transparent;
+  border-radius: 0;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.logo-text { color: #000000; font-weight: 700; font-size: 14px; white-space: nowrap; letter-spacing: -0.02em; }
+
+/* ===== HEADER: TABS ===== */
+.tab-nav {
+  display: flex; gap: 2px;
+  background: rgb(247,247,250);
+  padding: 3px;
+  border-radius: 10px;
+  margin: 0 auto;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.tab-btn {
+  padding: 5px 14px;
+  border: none; background: transparent;
+  color: rgb(154,154,154); font-size: 13px; font-weight: 500;
+  cursor: pointer; border-radius: 7px;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 7px;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.tab-btn:hover { color: #000000; background: rgba(0,0,0,0.05); }
+.tab-btn.active { background: #FFFFFF; color: #000000; box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.06); }
+.tab-badge {
+  background: rgba(120,57,238,0.1);
+  color: #7839EE;
+  padding: 1px 7px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+  min-width: 28px; text-align: center;
+}
+
+/* ===== HEADER: FILTERS ===== */
+.header-filters { display: flex; gap: 14px; margin-left: 4px; align-items: center; }
+.filter-group { display: flex; align-items: center; gap: 5px; }
+.filter-label { color: rgb(154,154,154); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+.filter-btn {
+  padding: 3px 9px;
+  border: 1.25px solid rgba(0,0,0,0.12); background: transparent;
+  color: rgb(154,154,154); font-size: 12px; font-weight: 500;
+  cursor: pointer; border-radius: 6px;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 4px;
+  font-family: inherit;
+}
+.filter-btn:hover { border-color: #7839EE; color: #7839EE; }
+.filter-btn.active .pdot { opacity: 0.85; }
+.filter-btn.active { background: #7839EE; border-color: #7839EE; color: #fff; }
+.pdot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.pdot-g { background: #4285F4; }
+.pdot-m { background: #1877F2; }
+
+/* ===== SIDEBAR ===== */
+.sidebar-section-label {
+  padding: 4px 16px 4px;
+  color: rgb(154,154,154); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin-top: 8px;
+}
+.sidebar-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 14px;
+  color: rgb(154,154,154); font-size: 12.5px;
+  cursor: pointer; border-left: 2px solid transparent;
+  transition: all 0.15s;
+  user-select: none;
+}
+.sidebar-item:hover { background: rgb(247,247,250); color: #000000; }
+.sidebar-item.active { background: rgba(120,57,238,0.05); color: #7839EE; border-left-color: #7839EE; }
+.sidebar-num {
+  width: 20px; height: 20px; border-radius: 4px;
+  background: rgb(247,247,250); color: rgb(154,154,154);
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all 0.15s;
+}
+.sidebar-item.active .sidebar-num { background: #7839EE; color: #fff; }
+.sidebar-item-label { flex: 1; line-height: 1.3; }
+.sidebar-pbar-wrap { width: 32px; height: 3px; background: rgba(0,0,0,0.08); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+.sidebar-pbar { height: 100%; background: #22C55E; border-radius: 2px; transition: width 0.4s; }
+
+/* ===== MODULE CONTENT TYPOGRAPHY ===== */
+.mc h1 { font-size: 26px; font-weight: 500; color: #000000; margin-bottom: 10px; line-height: 1.2; letter-spacing: -0.03em; }
+.mc h2 {
+  font-size: 19px; font-weight: 600; color: #000000;
+  margin: 44px 0 14px;
+  padding-bottom: 8px; border-bottom: 1.5px solid rgba(0,0,0,0.08);
+  line-height: 1.3; letter-spacing: -0.02em;
+}
+.mc h2:first-child { margin-top: 0; }
+.mc h3 { font-size: 14.5px; font-weight: 600; color: #000000; margin: 28px 0 10px; }
+.mc h4 { font-size: 12px; font-weight: 600; color: rgb(154,154,154); margin: 18px 0 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+.mc p { color: rgba(0,0,0,0.65); margin-bottom: 12px; font-size: 14px; line-height: 1.75; }
+.mc a { color: #7839EE; text-decoration: none; }
+.mc a:hover { text-decoration: underline; }
+.mc hr { border: none; border-top: 1.5px dashed rgba(0,0,0,0.08); margin: 28px 0; }
+.mc strong { color: #000000; font-weight: 600; }
+.mc em { color: rgb(154,154,154); font-style: italic; }
+
+/* Tables */
+.mc table {
+  width: 100%; border-collapse: collapse;
+  margin: 18px 0; font-size: 13px;
+  background: #fff; border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1.25px rgba(0,0,0,0.06);
+}
+.mc th {
+  background: rgb(247,247,250); color: rgb(154,154,154);
+  font-weight: 600; font-size: 11px;
+  text-align: left; padding: 9px 13px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.mc td {
+  padding: 9px 13px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  color: rgba(0,0,0,0.65); vertical-align: top; line-height: 1.55;
+}
+.mc tr:last-child td { border-bottom: none; }
+.mc tr:hover td { background: rgba(120,57,238,0.02); }
+
+/* Callouts */
+.callout {
+  display: flex; gap: 11px; align-items: flex-start;
+  padding: 13px 15px; border-radius: 8px;
+  margin: 14px 0; font-size: 13.5px; line-height: 1.65;
+}
+.callout p { margin: 0; font-size: 13.5px; }
+.callout strong { font-weight: 600; }
+.c-warn { background: #FFFBEB; border: 1.25px solid #FCD34D; color: #78350F; }
+.c-tip  { background: rgba(120,57,238,0.04); border: 1.25px solid rgba(120,57,238,0.2); color: #7839EE; }
+.callout-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+.callout-body { flex: 1; }
+
+/* Code */
+.mc code {
+  background: rgb(247,247,250); color: #7839EE;
+  padding: 1px 6px; border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Cascadia Code', Monaco, Consolas, monospace;
+  font-size: 11.5px; font-weight: 600;
+}
+.mc pre {
+  background: #000000; border-radius: 10px;
+  padding: 16px; overflow-x: auto; margin: 16px 0;
+}
+.mc pre code { background: none; color: #E2E8F0; font-size: 12.5px; padding: 0; font-weight: 400; }
+
+/* Lists */
+.mc ul, .mc ol { padding-left: 20px; margin: 10px 0; }
+.mc li { margin: 5px 0; font-size: 14px; color: rgba(0,0,0,0.65); line-height: 1.65; }
+
+/* Task lists */
+.mc ul.contains-task-list { padding-left: 0; list-style: none; }
+.mc .task-list-item {
+  list-style: none !important;
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: 7px 0; padding-left: 0;
+}
+.mc .task-list-item input[type="checkbox"].task-cb {
+  margin-top: 3px; flex-shrink: 0;
+  width: 15px; height: 15px;
+  accent-color: #7839EE; cursor: pointer;
+}
+
+/* ===== TRACK FILTER ===== */
+.track-filter { display: block; }
+body.pf-google .track-filter[data-track="meta"]    { display: none; }
+body.pf-meta   .track-filter[data-track="google"]  { display: none; }
+body.mf-ecommerce .track-filter[data-track="leadgen"]   { display: none; }
+body.mf-leadgen   .track-filter[data-track="ecommerce"] { display: none; }
+
+/* ===== QUICK REFERENCE ===== */
+.qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 18px; }
+.qr-card {
+  background: #fff; border-radius: 16px;
+  border: 1.25px solid rgba(0,0,0,0.08);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.qr-card-head {
+  padding: 11px 15px;
+  background: rgb(247,247,250); border-bottom: 1px solid rgba(0,0,0,0.06);
+  display: flex; align-items: center; gap: 8px;
+}
+.qr-card-title { font-size: 12.5px; font-weight: 600; color: #000000; flex: 1; }
+.qr-card-body { padding: 14px 15px; max-height: 480px; overflow-y: auto; }
+.qr-card-body table { font-size: 12px; margin: 0; }
+.qr-card-body th, .qr-card-body td { padding: 7px 10px; font-size: 12px; }
+.qr-card-body p { font-size: 13px; }
+
+/* ===== CHECKLISTS ===== */
+.cl-group { margin-bottom: 32px; }
+.cl-group-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.cl-group-title { font-size: 15px; font-weight: 600; color: #000000; letter-spacing: -0.01em; }
+.cl-pbar-wrap { flex: 1; max-width: 180px; height: 4px; background: rgba(0,0,0,0.08); border-radius: 3px; overflow: hidden; }
+.cl-pbar { height: 100%; background: #22C55E; border-radius: 3px; transition: width 0.4s; }
+.cl-count { font-size: 12px; color: rgb(154,154,154); font-weight: 600; }
+.cl-card { background: #fff; border-radius: 16px; border: 1.25px solid rgba(0,0,0,0.08); padding: 18px 20px; margin-bottom: 14px; }
+.cl-card-title { font-size: 13.5px; font-weight: 600; color: #000000; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+.cl-card-count { font-size: 12px; color: rgb(154,154,154); font-weight: 400; }
+
+/* ===== APEX / MY PROGRESS ===== */
+.apex-header {
+  background: linear-gradient(135deg, #7839EE 0%, #a855f7 100%);
+  border-radius: 16px; padding: 24px 28px; margin-bottom: 24px; color: #fff;
+  box-shadow: 0 10px 40px rgba(120,57,238,0.25);
+}
+.apex-header h2 { font-size: 20px; font-weight: 600; margin-bottom: 3px; letter-spacing: -0.03em; }
+.apex-header p { font-size: 13.5px; opacity: 0.8; margin-bottom: 18px; line-height: 1.5; }
+.apex-stats { display: flex; gap: 24px; }
+.apex-stat-val { font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
+.apex-stat-lbl { font-size: 12px; opacity: 0.7; margin-top: 3px; }
+.overall-pbar-wrap { flex: 1; max-width: 200px; align-self: center; }
+.overall-pbar-track { height: 5px; background: rgba(255,255,255,0.2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.overall-pbar-fill { height: 100%; background: #fff; border-radius: 3px; transition: width 0.4s; }
+.overall-pbar-lbl { font-size: 11px; opacity: 0.7; }
+
+.platform-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
+.pcol-head { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1.5px solid rgba(0,0,0,0.08); }
+.pcol-icon { width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.pcol-icon.google { background: rgba(66,133,244,0.1); }
+.pcol-icon.meta   { background: rgba(24,119,242,0.1); }
+.pcol-title { font-size: 15px; font-weight: 600; color: #000000; letter-spacing: -0.01em; }
+.pcol-pct { margin-left: auto; font-size: 13px; font-weight: 700; color: #7839EE; }
+
+.stage-card { background: #fff; border-radius: 16px; border: 1.25px solid rgba(0,0,0,0.08); margin-bottom: 12px; overflow: visible; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.stage-head { padding: 14px 16px; display: flex; align-items: center; gap: 11px; cursor: pointer; user-select: none; border-radius: 16px; }
+.stage-badge {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.s1 .stage-badge { background: #F59E0B; }
+.s2 .stage-badge { background: #3B82F6; }
+.s3 .stage-badge { background: #7839EE; }
+.s4 .stage-badge { background: #10B981; }
+.stage-info { flex: 1; }
+.stage-name { font-size: 13px; font-weight: 600; color: #000000; }
+.stage-desc { font-size: 11.5px; color: rgb(154,154,154); margin-top: 1px; }
+.stage-right { text-align: right; flex-shrink: 0; }
+.stage-prog-txt { font-size: 12px; font-weight: 600; color: #000000; }
+.stage-pbar-wrap { width: 72px; height: 3px; background: rgba(0,0,0,0.08); border-radius: 2px; overflow: hidden; margin-top: 5px; }
+.stage-pbar { height: 100%; border-radius: 2px; transition: width 0.4s; }
+.s1 .stage-pbar { background: #F59E0B; }
+.s2 .stage-pbar { background: #3B82F6; }
+.s3 .stage-pbar { background: #7839EE; }
+.s4 .stage-pbar { background: #10B981; }
+.stage-body { padding: 0 16px 14px; }
+.stage-done-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 20px;
+  background: #DCFCE7; color: #16A34A;
+  font-size: 11.5px; font-weight: 600; margin-bottom: 10px;
+}
+.stage-task {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: 7px 0; font-size: 13px; line-height: 1.55; color: rgba(0,0,0,0.7);
+}
+.stage-task > span { flex: 1; }
+.stage-task .tip-wrap { flex-shrink: 0; margin-left: auto; }
+.stage-task input[type="checkbox"] {
+  margin-top: 2px; flex-shrink: 0;
+  width: 14px; height: 14px;
+  accent-color: #7839EE; cursor: pointer;
+}
+.stage-task.done span { text-decoration: line-through; color: rgb(154,154,154); }
+
+/* ===== TASK TIPS ===== */
+.tip-wrap {
+  position: relative;
+  display: inline-flex; align-items: center; flex-shrink: 0;
+}
+.tip-btn {
+  width: 16px; height: 16px;
+  background: none; border: 1px solid #CBD5E1;
+  border-radius: 50%; color: #94A3B8;
+  font-size: 9px; font-weight: 700; font-style: italic;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; line-height: 1;
+  font-family: Georgia, serif;
+  transition: all 0.15s; margin-left: 6px; padding: 0;
+  vertical-align: middle;
+}
+.tip-btn:hover, .tip-btn.active { border-color: #7839EE; color: #7839EE; background: rgba(120,57,238,0.06); }
+.tip-bubble {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 10px);
+  left: auto;
+  transform: translateY(-50%);
+  width: 270px;
+  background: #000000;
+  color: rgba(255,255,255,0.8);
+  font-size: 12px; font-weight: 400; font-style: normal;
+  line-height: 1.6;
+  padding: 12px 14px;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  z-index: 500;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  white-space: normal;
+  text-align: left;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.tip-bubble::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 100%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-left-color: #000000;
+}
+.tip-wrap:hover .tip-bubble,
+.tip-wrap.tip-open .tip-bubble { opacity: 1; pointer-events: auto; }
+
+/* ===== TAGS ===== */
+.tag {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px; border-radius: 9999px;
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.tag-google    { background: rgba(66,133,244,0.08); color: #4285F4; }
+.tag-meta      { background: rgba(24,119,242,0.08); color: #1877F2; }
+.tag-ecommerce { background: #FFF7ED; color: #C2410C; }
+.tag-leadgen   { background: #F0F9FF; color: #0369A1; }
+.tag-both      { background: rgba(120,57,238,0.06); color: #7839EE; border: 1px solid rgba(120,57,238,0.15); }
+
+/* ===== PAGE HEADS ===== */
+.page-title { font-size: 21px; font-weight: 600; color: #000000; margin-bottom: 4px; letter-spacing: -0.025em; }
+.page-sub { font-size: 13.5px; color: rgb(154,154,154); margin-bottom: 24px; line-height: 1.5; }
+
+/* ===== INTRO CARD ===== */
+.intro-card {
+  background: #000000;
+  color: #fff; border-radius: 16px; padding: 24px 28px; margin-bottom: 28px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+}
+.intro-card h1 { font-size: 20px; font-weight: 600; margin-bottom: 7px; color: #fff; letter-spacing: -0.025em; }
+.intro-card p  { font-size: 13.5px; color: rgba(255,255,255,0.5); line-height: 1.7; margin: 0; }
+
+/* ===== RESET BUTTON ===== */
+.reset-btn {
+  background: transparent; border: 1.25px solid rgba(0,0,0,0.12); color: rgb(154,154,154);
+  padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
+  font-family: inherit; transition: all 0.15s; margin-left: auto;
+}
+.reset-btn:hover { border-color: #ef4444; color: #ef4444; }
+
+/* ===== LOADING ===== */
+.loading-screen { display: flex; align-items: center; justify-content: center; height: 100vh; background: #FFFFFF; }
+.loading-box { text-align: center; color: rgb(154,154,154); }
+.spinner {
+  width: 38px; height: 38px;
+  border: 3px solid rgba(0,0,0,0.08); border-top-color: #7839EE;
+  border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-box p { font-size: 13.5px; }
+.error-msg { color: #ef4444; font-size: 13.5px; margin-top: 8px; }
+
+/* ===== COLLAPSIBLE STAGES ===== */
+.stage-body.collapsed { display: none; }
+.stage-chevron { font-size: 11px; color: rgba(0,0,0,0.25); margin-left: 6px; transition: transform 0.2s; }
+.stage-head.open .stage-chevron { transform: rotate(180deg); }
+</style>
+</head>
+<body>
+
+<!-- Loading screen -->
+<div id="loading" class="loading-screen">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <p>Loading First-Party Data Hub…</p>
+  </div>
+</div>
+
+<!-- App shell (hidden until loaded) -->
+<div id="app" class="app" style="display:none">
+  <header class="header">
+    <!-- Logo -->
+    <div class="logo">
+      <div class="logo-mark"><img src="./bs-logo.png" alt="Boost.space" style="width:30px;height:30px;object-fit:contain;display:block;"></div>
+      <span class="logo-text">First-Party Data Hub</span>
+    </div>
+
+    <!-- Tab nav -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="learn">Learn</button>
+      <button class="tab-btn" data-tab="quickref">Quick Reference</button>
+      <button class="tab-btn" data-tab="checklists">Checklists</button>
+      <button class="tab-btn" data-tab="progress">My Progress <span class="tab-badge" id="apex-badge">0%</span></button>
+    </nav>
+
+    <!-- Filters -->
+    <div class="header-filters">
+      <div class="filter-group">
+        <span class="filter-label">Platform</span>
+        <button class="filter-btn active" data-filter="platform" data-value="all">All</button>
+        <button class="filter-btn" data-filter="platform" data-value="google"><span class="pdot pdot-g"></span>Google</button>
+        <button class="filter-btn" data-filter="platform" data-value="meta"><span class="pdot pdot-m"></span>Meta</button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Model</span>
+        <button class="filter-btn active" data-filter="model" data-value="all">All</button>
+        <button class="filter-btn" data-filter="model" data-value="ecommerce">E-com</button>
+        <button class="filter-btn" data-filter="model" data-value="leadgen">Lead Gen</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="body-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="content-wrap">
+      <main class="content" id="content"></main>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+<script>
+/* ============================================================
+   FIRST-PARTY DATA HUB — SINGLE-PAGE APP
+   Reads: ./first-party-data-framework.md
+   State: localStorage key "fpd_cb_v1"
+   ============================================================ */
+
+const FPD = (() => {
+  'use strict';
+
+  // ── STATE ─────────────────────────────────────────────────
+  const LS_KEY = 'fpd_cb_v1';
+  let cbState = {};       // id → boolean
+  let parsed  = null;     // parsed document structure
+  let state = {
+    tab: 'learn',
+    module: null,
+    platform: 'all',
+    model: 'all',
+  };
+
+  // ── PERSISTENCE ───────────────────────────────────────────
+  function loadCb() {
+    try { cbState = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); }
+    catch (e) { cbState = {}; }
+  }
+  function saveCb() { localStorage.setItem(LS_KEY, JSON.stringify(cbState)); }
+  function getCb(id) { return !!cbState[id]; }
+  function setCb(id, val) {
+    cbState[id] = val;
+    saveCb();
+    // Sync all matching checkboxes in current DOM
+    document.querySelectorAll(`input[data-cbid="${id}"]`).forEach(el => {
+      el.checked = val;
+      markTaskLabel(el, val);
+    });
+    recalcProgress();
+  }
+
+  // ── MARKDOWN PARSER ───────────────────────────────────────
+  function parseDocument(text) {
+    // Strip YAML frontmatter
+    const body = text.replace(/^---[\s\S]*?\n---\n/, '');
+
+    const doc = { intro: '', modules: [] };
+
+    // Split on <!-- module: X --> markers
+    const moduleParts = body.split(/(<!--\s*module:[^>]*-->)/);
+    moduleParts.forEach((chunk, i) => {
+      const mm = chunk.match(/<!--\s*module:\s*(\w+)(?:\s*\|\s*(.*?))?\s*-->/);
+      if (mm) {
+        const nextChunk = moduleParts[i + 1] || '';
+        doc.modules.push(buildModule(mm[1], nextChunk));
+      } else if (i === 0) {
+        doc.intro = chunk.trim();
+      }
+    });
+
+    return doc;
+  }
+
+  function buildModule(id, raw) {
+    const titleMatch = raw.match(/^##\s+(.+)/m);
+    const title = titleMatch
+      ? titleMatch[1].replace(/^Module\s+\d+:\s*/i, '').trim()
+      : id;
+
+    const sections = [];
+    const parts = raw.split(/(<!--\s*section:[^>]*-->)/);
+    let moduleIntro = '';
+
+    parts.forEach((chunk, i) => {
+      const sm = chunk.match(/<!--\s*section:\s*([^|>\n]+?)(?:\s*\|\s*(.*?))?\s*-->/);
+      if (sm) {
+        const sid = sm[1].trim();
+        const meta = parseMeta(sm[2] || '');
+        const content = parts[i + 1] || '';
+        sections.push({ id: sid, ...meta, raw: content });
+      } else if (i === 0) {
+        moduleIntro = chunk;
+      }
+    });
+
+    return { id, title, introRaw: moduleIntro, sections };
+  }
+
+  function parseMeta(str) {
+    const meta = {};
+    if (!str) return meta;
+    str.split('|').forEach(pair => {
+      const idx = pair.indexOf(':');
+      if (idx < 0) return;
+      const k = pair.slice(0, idx).trim().replace(/-/g, '_');
+      const v = pair.slice(idx + 1).trim();
+      meta[k] = v === 'true' ? true : v === 'false' ? false : v || true;
+    });
+    return meta;
+  }
+
+  // ── MARKDOWN RENDERER ─────────────────────────────────────
+  function mdToHtml(rawText, sectionId) {
+    // 1. Wrap <!-- track: X --> content in filterable divs
+    let text = rawText;
+    let openTrack = false;
+    text = text.replace(
+      /<!--\s*(?:track|subsection):\s*(\w+)(?:\s*\|\s*[^>]*)?\s*-->/g,
+      (_, track) => {
+        const close = openTrack ? '\n</div>\n' : '';
+        openTrack = true;
+        return `${close}\n<div class="track-filter" data-track="${track}">\n`;
+      }
+    );
+    if (openTrack) text += '\n</div>\n';
+
+    // 2. Remove remaining HTML comments
+    text = text.replace(/<!--[\s\S]*?-->/g, '');
+
+    // 3. Render with marked
+    let html = marked.parse(text, { gfm: true, breaks: false, html: true });
+
+    // 4. Interactive checkboxes (sequential IDs per section)
+    let cbIdx = 0;
+    html = html.replace(/<input(?:[^>]*)type="checkbox"(?:[^>]*)>/g, () => {
+      const id = `${sectionId}__${cbIdx++}`;
+      const chk = getCb(id) ? 'checked' : '';
+      return `<input type="checkbox" class="task-cb" data-cbid="${id}" ${chk} onchange="FPD.toggle('${id}',this.checked)">`;
+    });
+
+    // 5. Blockquotes → styled callouts
+    html = html.replace(
+      /<blockquote>\s*<p>(⚠️|🎯)([\s\S]*?)<\/p>\s*<\/blockquote>/g,
+      (_, icon, body) => {
+        const cls = icon === '⚠️' ? 'c-warn' : 'c-tip';
+        return `<div class="callout ${cls}"><span class="callout-icon">${icon}</span><div class="callout-body"><p>${body.trim()}</p></div></div>`;
+      }
+    );
+
+    return html;
+  }
+
+  // Count raw checkboxes in a section
+  function countRawCbs(raw) {
+    return (raw.match(/^- \[ \]/gm) || []).length;
+  }
+
+  function countChecked(sectionId, total) {
+    let n = 0;
+    for (let i = 0; i < total; i++) { if (getCb(`${sectionId}__${i}`)) n++; }
+    return n;
+  }
+
+  // ── APEX STAGE PARSER ─────────────────────────────────────
+  function parseApexStages(sectionId, raw) {
+    const stages = [];
+    // Remove track comments before splitting, so they don't break stage detection
+    // but still capture all checkboxes in order
+    const cleanRaw = raw.replace(/<!--[\s\S]*?-->/g, '');
+    const parts = cleanRaw.split(/\n---\n/);
+    let globalIdx = 0;
+
+    parts.forEach(part => {
+      const sm = part.match(/\*\*Stage\s+(\d+)\s*[—–-]+\s*([^*]+)\*\*/);
+      if (!sm) return;
+      const num  = parseInt(sm[1]);
+      const name = sm[2].trim();
+      const dm   = part.match(/\*\(([^)]+)\)\*/);
+      const desc = dm ? dm[1] : '';
+
+      const cbs = [];
+      const cbRx = /^-\s+\[\s+\]\s+(.+)$/gm;
+      let m;
+      while ((m = cbRx.exec(part)) !== null) {
+        cbs.push({ id: `${sectionId}__${globalIdx++}`, label: m[1].replace(/`([^`]+)`/g, '<code>$1</code>') });
+      }
+      stages.push({ num, name, desc, cbs });
+    });
+
+    return stages;
+  }
+
+  // ── HELPERS ───────────────────────────────────────────────
+  function sectionTitle(id) {
+    return id
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function markTaskLabel(input, val) {
+    const li = input.closest('li, .stage-task');
+    if (!li) return;
+    if (li.classList.contains('stage-task')) {
+      li.classList.toggle('done', val);
+    }
+  }
+
+  // Apply body filter classes
+  function applyFilter() {
+    ['pf-google','pf-meta','mf-ecommerce','mf-leadgen'].forEach(c => document.body.classList.remove(c));
+    if (state.platform !== 'all') document.body.classList.add(`pf-${state.platform}`);
+    if (state.model   !== 'all') document.body.classList.add(`mf-${state.model}`);
+  }
+
+  // ── PROGRESS ──────────────────────────────────────────────
+  function recalcProgress() {
+    if (!parsed) return;
+
+    // Apex-only progress → badge
+    let apexTotal = 0, apexDone = 0;
+    parsed.modules.forEach(m => {
+      m.sections.filter(s => s.apex).forEach(sec => {
+        const stages = parseApexStages(sec.id, sec.raw);
+        stages.forEach(st => {
+          apexTotal += st.cbs.length;
+          apexDone  += st.cbs.filter(cb => getCb(cb.id)).length;
+        });
+      });
+    });
+
+    const pct = apexTotal > 0 ? Math.round(apexDone / apexTotal * 100) : 0;
+    const badge = document.getElementById('apex-badge');
+    if (badge) badge.textContent = `${pct}%`;
+
+    // Sidebar module bars
+    parsed.modules.forEach(m => {
+      const barEl = document.querySelector(`.sidebar-pbar[data-module="${m.id}"]`);
+      if (!barEl) return;
+      let tot = 0, don = 0;
+      m.sections.forEach(s => {
+        const t = countRawCbs(s.raw);
+        tot += t;
+        don += countChecked(s.id, t);
+      });
+      barEl.style.width = tot > 0 ? `${Math.round(don/tot*100)}%` : '0%';
+    });
+  }
+
+  // ── RENDER: SIDEBAR ───────────────────────────────────────
+  function renderSidebar(showModules) {
+    const sidebar = document.getElementById('sidebar');
+    if (!showModules) { sidebar.classList.add('hidden'); return; }
+    sidebar.classList.remove('hidden');
+
+    if (!parsed) { sidebar.innerHTML = ''; return; }
+
+    let html = '<div class="sidebar-section-label">Modules</div>';
+    parsed.modules.forEach((m, i) => {
+      const isActive = m.id === state.module ? 'active' : '';
+      html += `
+        <div class="sidebar-item ${isActive}" onclick="FPD.goModule('${m.id}')">
+          <div class="sidebar-num">${i + 1}</div>
+          <span class="sidebar-item-label">${m.title}</span>
+          <div class="sidebar-pbar-wrap">
+            <div class="sidebar-pbar" data-module="${m.id}" style="width:0%"></div>
+          </div>
+        </div>`;
+    });
+
+    sidebar.innerHTML = html;
+    // Update bars
+    parsed.modules.forEach(m => {
+      const el = sidebar.querySelector(`.sidebar-pbar[data-module="${m.id}"]`);
+      if (!el) return;
+      let tot = 0, don = 0;
+      m.sections.forEach(s => { const t = countRawCbs(s.raw); tot += t; don += countChecked(s.id, t); });
+      el.style.width = tot > 0 ? `${Math.round(don/tot*100)}%` : '0%';
+    });
+  }
+
+  // ── RENDER: LEARN ─────────────────────────────────────────
+  function renderLearn() {
+    renderSidebar(true);
+    document.getElementById('content').classList.add('narrow');
+
+    if (!state.module && parsed.modules.length) state.module = parsed.modules[0].id;
+    const mod = parsed.modules.find(m => m.id === state.module);
+    if (!mod) return;
+
+    let html = '';
+
+    // Module intro
+    if (mod.introRaw.trim()) {
+      html += `<div class="mc">${mdToHtml(mod.introRaw, `${mod.id}__intro`)}</div>`;
+    }
+
+    // Sections
+    mod.sections.forEach(sec => {
+      html += `<div class="mc" id="sec-${sec.id}">${mdToHtml(sec.raw, sec.id)}</div>`;
+    });
+
+    document.getElementById('content').innerHTML = html;
+    applyFilter();
+    // Restore checkbox states visually
+    document.querySelectorAll('.task-cb').forEach(el => {
+      const val = getCb(el.dataset.cbid);
+      el.checked = val;
+      markTaskLabel(el, val);
+    });
+  }
+
+  // ── RENDER: QUICK REFERENCE ───────────────────────────────
+  function renderQuickRef() {
+    renderSidebar(false);
+    document.getElementById('content').classList.remove('narrow');
+
+    const qrSections = [];
+    parsed.modules.forEach(m => {
+      m.sections.filter(s => s.quick_reference).forEach(s => qrSections.push({ ...s, moduleName: m.title }));
+    });
+
+    let cards = '';
+    qrSections.forEach(s => {
+      const bodyHtml = mdToHtml(s.raw, s.id);
+      cards += `
+        <div class="qr-card">
+          <div class="qr-card-head">
+            <span class="qr-card-title">${sectionTitle(s.id)}</span>
+            <span class="tag tag-both">${s.moduleName}</span>
+          </div>
+          <div class="qr-card-body mc">${bodyHtml}</div>
+        </div>`;
+    });
+
+    document.getElementById('content').innerHTML = `
+      <div class="page-title">Quick Reference</div>
+      <div class="page-sub">Key tables, benchmarks, and specs — filtered by your active platform/model settings.</div>
+      <div class="qr-grid">${cards}</div>
+    `;
+    applyFilter();
+  }
+
+  // ── RENDER: CHECKLISTS ────────────────────────────────────
+  function renderChecklists() {
+    renderSidebar(false);
+    document.getElementById('content').classList.add('narrow');
+
+    let html = `
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+        <div class="page-title" style="margin:0">Checklists</div>
+        <button class="reset-btn" onclick="FPD.resetAll()">Reset all progress</button>
+      </div>
+      <div class="page-sub">Pre-launch and implementation checklists. Check off as you go — progress is saved in your browser.</div>
+    `;
+
+    parsed.modules.forEach(m => {
+      const clSecs = m.sections.filter(s => s.checklist && !s.apex);
+      if (!clSecs.length) return;
+
+      let modTotal = 0, modDone = 0;
+      clSecs.forEach(s => { const t = countRawCbs(s.raw); modTotal += t; modDone += countChecked(s.id, t); });
+      const modPct = modTotal > 0 ? Math.round(modDone/modTotal*100) : 0;
+
+      let cards = '';
+      clSecs.forEach(s => {
+        const t = countRawCbs(s.raw);
+        const d = countChecked(s.id, t);
+        const rendered = mdToHtml(s.raw, s.id);
+        cards += `
+          <div class="cl-card">
+            <div class="cl-card-title">
+              ${sectionTitle(s.id)}
+              <span class="cl-card-count" id="clcount_${s.id}">${d}/${t}</span>
+            </div>
+            <div class="mc">${rendered}</div>
+          </div>`;
+      });
+
+      html += `
+        <div class="cl-group">
+          <div class="cl-group-head">
+            <span class="cl-group-title">${m.title}</span>
+            <div class="cl-pbar-wrap"><div class="cl-pbar" style="width:${modPct}%"></div></div>
+            <span class="cl-count">${modDone}/${modTotal}</span>
+          </div>
+          ${cards}
+        </div>`;
+    });
+
+    document.getElementById('content').innerHTML = html;
+    applyFilter();
+
+    // Restore checkbox states
+    document.querySelectorAll('.task-cb').forEach(el => {
+      const val = getCb(el.dataset.cbid);
+      el.checked = val;
+    });
+  }
+
+  // ── TASK TIPS ─────────────────────────────────────────────────
+  const TIPS = {
+    // ── GOOGLE ADS APEX ROADMAP ──
+    // Stage 1 — Foundation
+    'google_apex_roadmap__0': 'Customer Match eligibility requires $50K+ lifetime Google Ads spend. Check Settings → Account information. Accounts below this threshold see a "not eligible" error on upload — there is no workaround until you reach the threshold.',
+    'google_apex_roadmap__1': 'Policy violations disable Customer Match instantly. Check the Notifications bell and Policy Manager tab. Even a resolved violation can leave the feature suspended for 24–72 hours while Google reviews the account.',
+    'google_apex_roadmap__2': 'Consent Mode v2 (Advanced) is required for Google to model conversions for EEA users who decline cookies — often 40–60% of EU visitors. Use Tag Assistant → Preview and verify "ad_user_data" and "ad_personalization" parameters fire on every page.',
+    'google_apex_roadmap__3': 'More CRM fields = higher match rate. Target 60%+ match rate. If under 40%, CRM data quality needs work before first-party targeting is viable. Email is the primary signal; add phone + first/last name as secondary.',
+    'google_apex_roadmap__4': 'Google hashes data on upload, but only if formats are correct. Email must be lowercase (no capitals, no spaces). Phone must use E.164 format: +14155552671. Wrong format = zero match for that field. Test a 100-row sample before automating.',
+    'google_apex_roadmap__5': 'Google disabled the legacy Google Ads API for Customer Match on April 1, 2026. Data Manager is now the only supported ingestion method. Go to Google Ads → Tools → Data Manager → New Connection. Any old API-based pipeline must be rebuilt.',
+    'google_apex_roadmap__6': '1,000 matched users is the minimum for Search/Shopping; 100 for YouTube/Display. Check Audience Manager → audience details. "Too small" or "Inactive" status means you need more data fields (phone, name) in your upload to boost match rate.',
+    'google_apex_roadmap__7': 'Smart Bidding (tCPA, tROAS, Maximize Conversions/Value) is the engine that uses Customer Match signals in bid decisions. Manual CPC ignores first-party data entirely. Any campaign still on Manual CPC or Enhanced CPC must migrate before Customer Match has any effect.',
+    // Stage 2 — Intermediate
+    'google_apex_roadmap__8': 'Path: Google Ads → Tools → Data Manager → Linked products → Google Analytics. After linking, enable "Personalized Advertising" — without this toggle, audiences never publish to Google Ads. Verify in Audience Manager → Sources tab.',
+    'google_apex_roadmap__9': 'Audiences take 24–48 hours after linking to populate. Verify in Audience Manager → click any audience → Sources tab → GA4 should appear. If missing, check GA4: Admin → Data collection → enable Google signals for cross-device audiences.',
+    'google_apex_roadmap__10': 'Observation mode: ads still reach everyone, but you get performance data segmented by audience. Targeting mode: ads only reach people on the list. Rule: Observation on all prospecting campaigns, Targeting only on pure remarketing with dedicated budgets.',
+    'google_apex_roadmap__11': 'Without suppression, you spend acquisition budget on people who already know you — inflating reported CAC. Build an "All Customers" list from your CRM and apply it as an exclusion (not observation) on every prospecting campaign.',
+    'google_apex_roadmap__12': 'Customer Match data expires after 540 days per Google policy. Set a weekly automated upload via Data Manager Scheduled Connections. Without regular refresh, lists slowly lose coverage as contacts age past the retention window.',
+    'google_apex_roadmap__13': 'Predictive Audiences use GA4 ML to forecast purchase probability in the next 7 days. The threshold was lowered to 200+ conversions in 2025 (from 1,000+). Research shows 34–42% higher CVR vs. manually defined segments. Enable in GA4 → Advertising → Predictive capabilities.',
+    'google_apex_roadmap__14': 'Campaign type rules: PMax uses Customer Match as signal only (not hard targeting). Search/Shopping: Observation for bid adjustment, Targeting for pure remarketing. Mismatched modes waste budget or unnecessarily restrict reach.',
+    'google_apex_roadmap__15': 'Similar Audiences were removed August 2023 and do nothing. Replace: Display/Discovery → Optimized Targeting. Video → Audience Expansion. Demand Gen → Lookalike Segments (the only Google campaign type with explicit LAL). Clean up legacy references.',
+    // Stage 3 — Advanced ecommerce (indices 16–22)
+    'google_apex_roadmap__16': 'RFM = Recency, Frequency, Monetary. Champions: bought recently, often, high spend. At-Risk: used to be Champions, no purchase in 60–90 days. Hibernating: no activity 90–180 days. Each segment needs a different bid strategy and creative approach.',
+    'google_apex_roadmap__17': 'Conversion Value Rules tell Smart Bidding "a sale to a Champion is worth 1.5x more than a first-time buyer." Create in Google Ads → Tools → Conversions → Conversion Value Rules. Without this, Smart Bidding treats all conversions equally — optimizing for volume, not LTV.',
+    'google_apex_roadmap__18': 'Without NCA goal, acquisition campaigns quietly re-convert existing customers who would buy anyway — wasting budget and inflating reported ROAS. NCA goal ensures the algorithm genuinely optimizes for new buyers. Set in campaign settings → Bidding → New customer acquisition.',
+    'google_apex_roadmap__19': '"New customers only": ads exclusively shown to new customers (pure acquisition, lower volume). "New customer value": shows to everyone but bids higher for new customers. Start with "New customer value" for less disruption, then test "New customers only" on separate campaigns.',
+    'google_apex_roadmap__20': 'The uplift value signals how much a new customer is worth vs. a returning buyer. Recommended: 1.5x–2x AOV. Example: AOV €100 → set uplift €50–€100. Too low = under-bidding for new customers. Too high = burning budget on over-aggressive bids.',
+    'google_apex_roadmap__21': 'Cart abandoners convert at 3–5x the rate of cold traffic — they showed clear purchase intent. Recommended durations: cart abandoners 7–14 days (intent fades fast), product viewers 14–30 days. Beyond 30 days, the intent signal is too diluted to justify the premium bid.',
+    'google_apex_roadmap__22': 'Champions respond to loyalty messaging — "exclusive early access," "thank you for being a top customer" — not generic acquisition ads. Expected lift: 20–40% higher CTR vs. generic creative. Champions who see irrelevant acquisition ads perceive it as tone-deaf.',
+    // Stage 3 — Advanced leadgen (indices 23–30)
+    'google_apex_roadmap__23': 'gclid is the only link between a Google ad click and your offline conversion. Add a hidden form field named "gclid" that auto-populates from the URL parameter. Test: click a Google ad, submit the form, open CRM — the lead must show a populated gclid. No gclid = OCI cannot work.',
+    'google_apex_roadmap__24': 'OCI lets Google optimize for actual business outcomes (qualified leads, closed deals) instead of form fills. The conversion_environment field (required since Sept 2025) distinguishes web vs. in-app conversions. Missing this field causes import errors that silently break OCI.',
+    'google_apex_roadmap__25': 'Always run a manual test upload before automating. Go to: Google Ads → Goals → Conversions → Upload. Upload a 50–100 row CSV and check the status report. Common failures: gclid expired (>90 days old), wrong date format, wrong conversion action name.',
+    'google_apex_roadmap__26': 'Create separate conversion actions: Closed-Won (primary — Smart Bidding target), SQL (secondary — reporting), MQL (informational). Smart Bidding optimizes toward whatever is set as primary — make sure it is your highest-value outcome, not just the most frequent.',
+    'google_apex_roadmap__27': 'ECL uses hashed email/phone from your lead form to match conversions even without gclid (ad blockers, cross-device). It is a fallback layer for OCI. Implement via Google Tag in GTM. Verify in Tag Assistant — look for the "enhanced_conversions" parameter in the tag fire.',
+    'google_apex_roadmap__28': 'Running both ECL and OCI on the same conversion action is intentional — they are two matching methods for the same event. Google uses whichever match is available. ECL catches conversions OCI misses (missing gclid). Together they maximize match coverage.',
+    'google_apex_roadmap__29': 'Observation mode lets you see "if I had targeted these people, what would CPA look like?" Run MQL/SQL/Closed-Won lists in Observation for 4–6 weeks to gather data. This informs whether to switch to Targeting mode or add bid adjustments for these segments.',
+    'google_apex_roadmap__30': 'Converted leads need nurturing — not acquisition ads. Suppressing them prevents wasted spend and keeps your acquisition CPA clean. Converted leads who re-engage via acquisition ads make your CAC look artificially better than it really is.',
+    // Stage 4 — Apex
+    'google_apex_roadmap__31': 'CLO is Google\'s AI suite inside Data Manager that automates RFM segmentation and creates predictive audiences from your CRM data. Check Data Manager → AI Recommendations. Typically available to advertisers with significant conversion history.',
+    'google_apex_roadmap__32': 'To validate GA4 Predictive Audiences, run a Google Ads Experiment: Control uses manual audiences, Treatment uses GA4 Predictive. Run 4–6 weeks. If Predictive wins on CPA at similar volume, migrate permanently and document the result for future budget decisions.',
+    'google_apex_roadmap__33': 'Geo-holdout: some regions see Customer Match, others do not. Campaign Experiment: 50/50 traffic split. Run 4–6 weeks, compare CPA between exposed and holdout. This is the only way to prove Customer Match drives incremental conversions — not just claims credit for conversions that would happen anyway.',
+    'google_apex_roadmap__34': 'For Smart Bidding to optimize for LTV, your conversion values must represent predicted lifetime value — not just first-transaction revenue. Feed LTV tier values into Conversion Value Rules: Champions = 2.5x, New Customers = 1.8x, At-Risk = 1.0x. Smart Bidding then seeks the most profitable customers.',
+    'google_apex_roadmap__35': 'MMM requires clean historical revenue by channel. Your CRM is the source of truth — not platform attribution. Export monthly CRM revenue by acquisition channel for 2+ years. This feeds the model with accurate data that is not inflated by platform self-reported attribution.',
+    'google_apex_roadmap__36': 'Manual uploads are error-prone and easily forgotten. Data Manager Scheduled Connections automate the pipeline: CRM export → Data Manager → Customer Match list refresh. Go to Data Manager → Connections → New Connection → select data source → set weekly schedule.',
+    'google_apex_roadmap__37': 'Win-back campaigns are time-sensitive. At-Risk (60–90 days since last purchase): urgency messaging works. Hibernating (90–180 days): needs a stronger hook — offer or new product announcement. Beyond 180 days, reacquisition cost approaches new-customer CAC.',
+    'google_apex_roadmap__38': 'PMax audience signals degrade if not refreshed. Champions list with fewer than 1,000 matched users may be ignored by PMax entirely. Review quarterly: is the Champions list still 1,000+ matched? Is it the highest-quality signal? Test alternatives if match count has dropped.',
+    'google_apex_roadmap__39': 'OCI coverage rate = successfully matched conversions ÷ total offline conversions × 100. Below 80% = weak optimization signal. Root causes: gclid not captured on form (missing hidden field), leads with gclid older than 90 days, or direct-traffic leads with no gclid.',
+    'google_apex_roadmap__40': 'Annual audits prevent zombie audiences — segments defined years ago that no longer reflect your customer base. Update RFM tier thresholds if AOV changed. Delete lists with fewer than 100 matched users. Review Conversion Value Rules for accuracy after product or pricing changes.',
+
+    // ── META ADS APEX ROADMAP ──
+    // Stage 1 — Foundation
+    'meta_apex_roadmap__0': 'Pixel must fire PageView on every page and the correct event on each conversion page (Purchase, Lead, CompleteRegistration). Use Events Manager → Test Events or the Meta Pixel Helper Chrome extension. Missing events on conversion pages break all downstream optimization.',
+    'meta_apex_roadmap__1': 'Duplicate events are as damaging as missing ones — they double-count conversions and corrupt Smart Bidding. In Events Manager, look for any event showing 2x expected volume. Common cause: Pixel fires in both the page template AND a GTM tag.',
+    'meta_apex_roadmap__2': 'Without accepting Custom Audience ToS, you cannot create any Customer List audience. Go to: Ads Manager → Audiences → Create Audience → Custom Audience → Customer List. You will see a ToS prompt if not yet accepted. This is a one-time account-level action.',
+    'meta_apex_roadmap__3': 'Email is the strongest matching identifier. Phone is critical for mobile-heavy markets. Without both, EMQ struggles to reach 7+. Adding first + last name and date of birth can add 0.5–1.0 points to your EMQ score.',
+    'meta_apex_roadmap__4': '100 matched users is the minimum to activate a Custom Audience. Upload 500+ contacts for a healthy baseline. Below 100, the audience shows "Too Small" and cannot be used for targeting. To boost match rate, add more identifiers: DOB, postal code, phone.',
+    'meta_apex_roadmap__5': 'CAPI options ranked by effort: (1) Conversions API Gateway — Meta-hosted, no code. (2) Native platform integration (Shopify, WooCommerce). (3) GTM server-side. (4) Direct API — full control, highest effort. Hybrid Pixel + CAPI consistently reduces CPA by 13–20% vs. Pixel only.',
+    'meta_apex_roadmap__6': 'In Events Manager, the "Received" column must show events from two sources: "Browser" (Pixel) and "Server" (CAPI). If only Browser shows, CAPI is not sending events. Check API credentials and event_time format (must be Unix timestamp, not ISO string).',
+    'meta_apex_roadmap__7': 'Deduplication is critical — without it, every conversion is double-counted. The event_id must be identical in both Pixel and CAPI payloads for the same user action. Generate a UUID at conversion time and pass it to both. Correctly deduplicated events show a "Deduplicated" label in Events Manager.',
+    'meta_apex_roadmap__8': 'OCAPI was deprecated May 2025. Any offline conversion tracking using the old Offline Conversions API must migrate to CAPI with action_source: "crm" or "physical_store". Verify migrated events appear in Events Manager — OCAPI events are no longer processed.',
+    // Stage 2 — Intermediate
+    'meta_apex_roadmap__9': 'EMQ measures how reliably Meta can match an event to a user profile. Score 0–10. Below 7: attribution and optimization both degrade significantly. Check: Events Manager → Data Sources → [your Pixel] → Event Match Quality tab. Score updates daily.',
+    'meta_apex_roadmap__10': 'Purchase and Lead events drive campaign optimization. EMQ 8+ on these is the threshold for reliable Smart Bidding. To get from 7 to 8: add fbclid to events, include phone number, add DOB from loyalty data, verify CAPI deduplication is active.',
+    'meta_apex_roadmap__11': 'All PII fields (email, phone, first name, last name, DOB, city, postal code) must be SHA-256 hashed before sending. Exception: MADID and external_id must NOT be hashed — pass raw. Wrong hashing = zero matching contribution from that field.',
+    'meta_apex_roadmap__12': 'fbclid is Meta\'s click identifier appended to ad-click URLs. It enables conversion attribution in cookieless environments. Capture it on page load from the URL parameter and store it in your conversion event payload as the fbc field. Without fbclid, attribution relies entirely on weaker signals.',
+    'meta_apex_roadmap__13': 'Custom Audiences have a 180-day retention policy — users are removed if not re-added within 180 days. Weekly refresh keeps audiences current. Stale audiences lose members and match rates drop, degrading optimization over time.',
+    'meta_apex_roadmap__14': 'Recent purchasers excluded from acquisition campaigns = lower wasted spend + cleaner CAC metrics. Standard setup: suppress anyone who purchased in the last 14–30 days. Without exclusions, you pay acquisition CPMs to users already in a post-purchase satisfaction window.',
+    'meta_apex_roadmap__15': 'At minimum, suppress: recent purchasers (7–30 days), current subscribers, recently converted leads. Apply as exclusions at ad set level — not as separate campaigns. This reduces acquisition CPM by 10–15% by improving the quality signal of your prospecting audience.',
+    'meta_apex_roadmap__16': 'For Lookalike seeds, quality beats size every time. 1,000 Champions (highest-LTV customers) outperforms 50,000 generic buyers. Optimal seed size: 1,000–50,000 matched users. Always seed from: Champions/high-LTV purchasers (ecommerce) or Closed-Won customers (lead gen).',
+    // Stage 3 — Advanced ecommerce (indices 17–23)
+    'meta_apex_roadmap__17': 'Four-layer funnel: ACQUISITION (Lookalike/Advantage+), MID-FUNNEL (site visitors 30d, video viewers), RETENTION (existing customers by RFM), SUPPRESSION (recent buyers excluded from acquisition and mid-funnel). Without this structure, campaigns cannibalize each other\'s audiences.',
+    'meta_apex_roadmap__18': 'Include content_ids (product SKUs), value, and currency in CAPI payloads on ViewContent, AddToCart, and Purchase. Without content_ids, Meta cannot run Dynamic Product Ads retargeting specific products users viewed. This is the foundation of catalog-based retargeting.',
+    'meta_apex_roadmap__19': 'RFM Custom Audiences enable segment-specific bidding and creative. Champions → retention/upsell. At-Risk → win-back with strong offer. New Customers → nurture toward second purchase. Hibernating → last-chance win-back. Each segment has a different expected ROAS.',
+    'meta_apex_roadmap__20': 'Retention campaigns for existing customers typically achieve 3–5x higher ROAS than prospecting. Use separate campaigns with different budgets and tailored creative. Mixing retention and prospecting in one campaign causes the algorithm to underperform on both.',
+    'meta_apex_roadmap__21': 'Dynamic Product Ads automatically show users the exact products they viewed or added to cart. They require your Catalog connected to Events Manager and CAPI/Pixel events passing content_ids. They outperform static ads for retargeting because they are personalized by definition.',
+    'meta_apex_roadmap__22': 'ASC (Advantage+ Sales Campaigns) saw 70% YoY growth in Q4 2025. Providing your Customer List as an audience signal tells the algorithm which users represent your ideal customer. Without a signal, ASC starts cold. Feed it your Champions or recent high-value buyers.',
+    'meta_apex_roadmap__23': 'A Lookalike or Advantage+ Audience seeded from Champions finds users with similar behavioral patterns to your actual highest-LTV customers. This outperforms seeds from generic site visitors. Use 1–3% LAL for precision, or Advantage+ Audience for broader algorithmic expansion.',
+    // Stage 3 — Advanced leadgen (indices 24–30)
+    'meta_apex_roadmap__24': 'fbclid is appended to your landing page URL when someone clicks a Meta ad. Add a hidden form field that auto-populates from the URL. Verify: open 10 recent Meta leads in CRM — each must have fbclid populated. Without it, the CRM → CAPI feedback loop cannot close attribution for Meta leads.',
+    'meta_apex_roadmap__25': 'When a lead reaches MQL/SQL/Closed-Won in CRM, send a CAPI event back to Meta with action_source: "crm". This teaches Meta what a quality lead looks like — progressively improving lead quality over 30+ days. This feedback loop is what makes Conversion Leads optimization work.',
+    'meta_apex_roadmap__26': 'The Meta Lead ID (15–16 digit numeric) is the unique identifier Meta assigns to each Lead Ad submission. Store it in CRM for every Meta lead. Without it, your CAPI feedback loop cannot attribute CRM qualification events back to the original Meta Lead Ad.',
+    'meta_apex_roadmap__27': 'Conversion Leads optimization trains Meta to find users who convert to quality leads (MQL/SQL/Closed-Won), not just form fills. This reduces cost-per-quality-lead by up to 15% over 30+ days. Prerequisites: CAPI active, CRM feedback loop live for at least 2 weeks.',
+    'meta_apex_roadmap__28': 'Funnel-stage audiences enable separate campaigns per stage: MQL → nurturing, SQL → demo/trial, Closed-Won → upsell. They also enable proper suppression: MQLs should be excluded from raw acquisition campaigns since they are already in your funnel.',
+    'meta_apex_roadmap__29': 'Showing acquisition ads to converted customers is classic funnel leakage. Apply Closed-Won as an exclusion on all acquisition campaigns. This also prevents brand confusion — converted customers should not see "Get started free" acquisition ads.',
+    'meta_apex_roadmap__30': 'Closed-Won customers are the best possible LAL seed — your actual buyers, not just site visitors. A LAL from 1,000+ Closed-Won customers finds users with similar behavioral and professional patterns. This is the highest-quality prospecting signal you can give Meta.',
+    // Stage 4 — Apex
+    'meta_apex_roadmap__31': 'Conversion Lift creates a randomized controlled experiment: a holdout group (not shown ads) vs. an exposed group. The difference in conversion rate = incremental lift. This is the only way to prove first-party data drives results — not just gets attribution credit.',
+    'meta_apex_roadmap__32': 'EMQ can drop silently if CAPI breaks, Pixel changes, or fbclid stops being captured. Monitor via Events Manager API and create an alert if EMQ drops below 7 on any conversion event. Catching drops within 24 hours prevents prolonged algorithm optimization damage.',
+    'meta_apex_roadmap__33': 'The Conversion Leads algorithm needs 30+ days of consistent CRM signal data to exit the learning phase. Before that, CPLs will be volatile. Do not change budgets or bid strategies during this period — it resets the learning phase and delays performance improvement.',
+    'meta_apex_roadmap__34': 'Traditional Lookalike Audiences are becoming less effective as Meta\'s AI improves. Advantage+ Audience uses your Customer List as a suggestion for algorithmic expansion. Test: run identical campaigns — one with explicit 1–3% LAL, one with Advantage+ Audience. Measure CPA over 4+ weeks.',
+    'meta_apex_roadmap__35': 'Meta Advanced Analytics is a privacy-preserving clean room for analyzing first-party segments against Meta behavioral data without exposing individual users. Access via Meta Business Suite → Analytics. Research shows 27x performance variation between best and worst-performing segments.',
+    'meta_apex_roadmap__36': 'Your audience segment tells you what message to use. Champions respond to "exclusive early access" and loyalty rewards. Hibernating customers respond to "we miss you — 20% off." Generic creatives served to all segments leave 20–40% CTR improvement on the table.',
+    'meta_apex_roadmap__37': 'Purchase events should fire in real time (within seconds of purchase confirmation), not in hourly or daily batches. Delayed events degrade attribution accuracy. Implement a webhook on purchase confirmation to trigger CAPI immediately. Check event delay in Events Manager.',
+    'meta_apex_roadmap__38': 'Using the same CRM export for both Google Customer Match and Meta Custom Audience exclusions creates unified cross-platform suppression. A customer excluded only on Meta but not Google sees your acquisition ads on Google — and vice versa. One export, consistent experience.',
+    'meta_apex_roadmap__39': 'Annual review prevents data rot: EMQ drifts without attention, Custom Audience seeds go stale, CAPI payloads can lose fields after platform updates. Schedule a Q1 audit: check EMQ on all events, verify deduplication, confirm all Custom Audiences have 1,000+ matched users.',
+  };
+
+  function tipToggle(e, id) {
+    e.stopPropagation();
+    const btn = e.currentTarget;
+    const wrap = btn.closest('.tip-wrap');
+    if (!wrap) return;
+    const isOpen = wrap.classList.contains('tip-open');
+    // Close all other open tips
+    document.querySelectorAll('.tip-wrap.tip-open').forEach(w => {
+      w.classList.remove('tip-open');
+      const b = w.querySelector('.tip-btn');
+      if (b) b.classList.remove('active');
+    });
+    if (!isOpen) {
+      wrap.classList.add('tip-open');
+      btn.classList.add('active');
+    }
+  }
+
+  // Close tips when clicking elsewhere
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.tip-wrap.tip-open').forEach(w => {
+      w.classList.remove('tip-open');
+      const b = w.querySelector('.tip-btn');
+      if (b) b.classList.remove('active');
+    });
+  });
+
+  // ── RENDER: MY PROGRESS ───────────────────────────────────
+  function renderProgress() {
+    renderSidebar(false);
+    document.getElementById('content').classList.remove('narrow');
+
+    const apexSecs = {};
+    parsed.modules.forEach(m => {
+      m.sections.filter(s => s.apex).forEach(s => {
+        if (s.id.includes('google')) apexSecs.google = s;
+        else if (s.id.includes('meta')) apexSecs.meta = s;
+      });
+    });
+
+    // Overall stats
+    let grandTotal = 0, grandDone = 0;
+    ['google','meta'].forEach(p => {
+      const sec = apexSecs[p];
+      if (!sec) return;
+      parseApexStages(sec.id, sec.raw).forEach(st => {
+        grandTotal += st.cbs.length;
+        grandDone  += st.cbs.filter(cb => getCb(cb.id)).length;
+      });
+    });
+    const overallPct = grandTotal > 0 ? Math.round(grandDone/grandTotal*100) : 0;
+
+    function buildPlatformCol(platform) {
+      const sec = apexSecs[platform];
+      if (!sec) return `<p style="color:#94A3B8;font-size:13px">No apex roadmap found for this platform.</p>`;
+
+      const stages = parseApexStages(sec.id, sec.raw);
+      let platTotal = 0, platDone = 0;
+      stages.forEach(st => { platTotal += st.cbs.length; platDone += st.cbs.filter(cb => getCb(cb.id)).length; });
+      const platPct = platTotal > 0 ? Math.round(platDone/platTotal*100) : 0;
+
+      const icon = platform === 'google' ? '🔵' : '🟦';
+      const label = platform === 'google' ? 'Google Ads' : 'Meta Ads';
+
+      let stagesHtml = '';
+      stages.forEach(st => {
+        const done = st.cbs.filter(cb => getCb(cb.id)).length;
+        const tot  = st.cbs.length;
+        const pct  = tot > 0 ? Math.round(done/tot*100) : 0;
+        const full = done === tot && tot > 0;
+
+        let cbsHtml = '';
+        st.cbs.forEach(cb => {
+          const chk = getCb(cb.id);
+          const tip = TIPS[cb.id];
+          const tipHtml = tip
+            ? `<span class="tip-wrap"><button class="tip-btn" onclick="FPD.tipToggle(event,'${cb.id}')" title="Show tip">i</button><span class="tip-bubble">${tip}</span></span>`
+            : '';
+          cbsHtml += `
+            <div class="stage-task ${chk ? 'done' : ''}" data-stage-task>
+              <input type="checkbox" data-cbid="${cb.id}" ${chk ? 'checked' : ''}
+                onchange="FPD.toggle('${cb.id}', this.checked)">
+              <span>${cb.label}</span>${tipHtml}
+            </div>`;
+        });
+
+        stagesHtml += `
+          <div class="stage-card s${st.num}">
+            <div class="stage-head" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('collapsed')">
+              <div class="stage-badge">${st.num}</div>
+              <div class="stage-info">
+                <div class="stage-name">${st.name}</div>
+                ${st.desc ? `<div class="stage-desc">${st.desc}</div>` : ''}
+              </div>
+              <div class="stage-right">
+                <div class="stage-prog-txt">${done}/${tot}</div>
+                <div class="stage-pbar-wrap"><div class="stage-pbar" style="width:${pct}%"></div></div>
+              </div>
+              <span class="stage-chevron">▾</span>
+            </div>
+            <div class="stage-body">
+              ${full ? '<div class="stage-done-pill">✓ Stage Complete</div>' : ''}
+              ${cbsHtml}
+            </div>
+          </div>`;
+      });
+
+      return `
+        <div class="pcol-head">
+          <div class="pcol-icon ${platform}">${icon}</div>
+          <div class="pcol-title">${label}</div>
+          <div class="pcol-pct" data-pcol-pct="${platform}">${platPct}%</div>
+        </div>
+        ${stagesHtml}
+      `;
+    }
+
+    document.getElementById('content').innerHTML = `
+      <div class="apex-header">
+        <h2>My Progress Tracker</h2>
+        <p>Four maturity stages per platform. Complete Foundation before Intermediate. Move through each stage to reach Apex — full first-party data potential.</p>
+        <div class="apex-stats">
+          <div>
+            <div class="apex-stat-val">${overallPct}%</div>
+            <div class="apex-stat-lbl">Overall Complete</div>
+          </div>
+          <div>
+            <div class="apex-stat-val">${grandDone}</div>
+            <div class="apex-stat-lbl">Tasks Done</div>
+          </div>
+          <div>
+            <div class="apex-stat-val">${grandTotal - grandDone}</div>
+            <div class="apex-stat-lbl">Remaining</div>
+          </div>
+          <div class="overall-pbar-wrap">
+            <div class="overall-pbar-lbl">Progress</div>
+            <div class="overall-pbar-track">
+              <div class="overall-pbar-fill" style="width:${overallPct}%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="platform-cols">
+        <div class="track-filter" data-track="google">${buildPlatformCol('google')}</div>
+        <div class="track-filter" data-track="meta">${buildPlatformCol('meta')}</div>
+      </div>
+    `;
+  }
+
+  // ── NAVIGATION ────────────────────────────────────────────
+  function goTab(tab) {
+    state.tab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.getElementById('content').innerHTML = '';
+    if (tab === 'learn')      renderLearn();
+    else if (tab === 'quickref')   renderQuickRef();
+    else if (tab === 'checklists') renderChecklists();
+    else if (tab === 'progress')   renderProgress();
+    recalcProgress();
+  }
+
+  function goModule(id) {
+    state.module = id;
+    document.querySelectorAll('.sidebar-item').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('onclick').includes(`'${id}'`));
+    });
+    renderLearn();
+    recalcProgress();
+  }
+
+  function setFilter(type, value) {
+    state[type] = value;
+    document.querySelectorAll(`[data-filter="${type}"]`).forEach(b => b.classList.toggle('active', b.dataset.value === value));
+    applyFilter();
+  }
+
+  // Public: checkbox toggle (called from inline onchange)
+  function toggle(id, val) {
+    setCb(id, val);
+    // If we're in the progress tab, re-render to update counters
+    if (state.tab === 'progress') {
+      // Lightweight update: just recalc numbers without full re-render
+      updateProgressCounters();
+    }
+    if (state.tab === 'checklists') {
+      updateChecklistCounters();
+    }
+    recalcProgress();
+  }
+
+  function updateProgressCounters() {
+    if (!parsed) return;
+    // Update per-stage counters
+    const apexSecs = {};
+    parsed.modules.forEach(m => {
+      m.sections.filter(s => s.apex).forEach(s => {
+        if (s.id.includes('google')) apexSecs.google = s;
+        else if (s.id.includes('meta')) apexSecs.meta = s;
+      });
+    });
+
+    let grandTotal = 0, grandDone = 0;
+    ['google','meta'].forEach(p => {
+      const sec = apexSecs[p];
+      if (!sec) return;
+      let platTotal = 0, platDone = 0;
+      parseApexStages(sec.id, sec.raw).forEach(st => {
+        platTotal += st.cbs.length;
+        platDone  += st.cbs.filter(cb => getCb(cb.id)).length;
+        grandTotal += st.cbs.length;
+        grandDone  += st.cbs.filter(cb => getCb(cb.id)).length;
+
+        // Update stage bar and text (find by counting stage-card elements)
+      });
+      const pctEl = document.querySelector(`[data-pcol-pct="${p}"]`);
+      if (pctEl) pctEl.textContent = `${platTotal > 0 ? Math.round(platDone/platTotal*100) : 0}%`;
+    });
+
+    // Update overall bar
+    const overallPct = grandTotal > 0 ? Math.round(grandDone/grandTotal*100) : 0;
+    const fill = document.querySelector('.overall-pbar-fill');
+    if (fill) fill.style.width = `${overallPct}%`;
+
+    // Update apex stats
+    const statVals = document.querySelectorAll('.apex-stat-val');
+    if (statVals[0]) statVals[0].textContent = `${overallPct}%`;
+    if (statVals[1]) statVals[1].textContent = grandDone;
+    if (statVals[2]) statVals[2].textContent = grandTotal - grandDone;
+
+    // Update stage-level bars
+    document.querySelectorAll('.stage-card').forEach(card => {
+      const progTxt = card.querySelector('.stage-prog-txt');
+      const progBar = card.querySelector('.stage-pbar');
+      const donePill = card.querySelector('.stage-done-pill');
+      if (!progTxt || !progBar) return;
+      const inputs = card.querySelectorAll('input[type="checkbox"]');
+      let tot = inputs.length, don = 0;
+      inputs.forEach(inp => { if (getCb(inp.dataset.cbid)) don++; });
+      progTxt.textContent = `${don}/${tot}`;
+      progBar.style.width = tot > 0 ? `${Math.round(don/tot*100)}%` : '0%';
+      if (donePill) donePill.style.display = (don === tot && tot > 0) ? '' : 'none';
+    });
+  }
+
+  function updateChecklistCounters() {
+    document.querySelectorAll('[id^="clcount_"]').forEach(el => {
+      const sid = el.id.replace('clcount_', '');
+      const sec = findSection(sid);
+      if (!sec) return;
+      const t = countRawCbs(sec.raw);
+      const d = countChecked(sid, t);
+      el.textContent = `${d}/${t}`;
+    });
+  }
+
+  function findSection(id) {
+    for (const m of parsed.modules) {
+      const s = m.sections.find(s => s.id === id);
+      if (s) return s;
+    }
+    return null;
+  }
+
+  function resetAll() {
+    if (!confirm('Reset all checklist progress? This cannot be undone.')) return;
+    cbState = {};
+    saveCb();
+    goTab(state.tab);
+    recalcProgress();
+  }
+
+  // ── INIT ──────────────────────────────────────────────────
+  async function init() {
+    loadCb();
+
+    // Bind tab buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => goTab(btn.dataset.tab));
+    });
+
+    // Bind filter buttons
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => setFilter(btn.dataset.filter, btn.dataset.value));
+    });
+
+    // Load markdown
+    let mdText;
+    try {
+      const resp = await fetch('./first-party-data-framework.md', { cache: 'no-store' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      mdText = await resp.text();
+    } catch (err) {
+      document.getElementById('loading').innerHTML = `
+        <div class="loading-box">
+          <p style="color:#F87171;font-size:14px">⚠ Could not load framework file.</p>
+          <p class="error-msg" style="margin-top:8px">Serve this HTML from the same directory as<br><code style="color:#94A3B8">first-party-data-framework.md</code></p>
+          <p class="error-msg">${err.message}</p>
+        </div>`;
+      return;
+    }
+
+    // Parse
+    parsed = parseDocument(mdText);
+
+    // Show app
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+
+    // Initial render
+    goTab('learn');
+  }
+
+  // Public API
+  return { init, toggle, goModule, goTab, setFilter, resetAll, tipToggle };
+
+})();
+
+document.addEventListener('DOMContentLoaded', () => FPD.init());
+</script>
+</body>
+</html>
