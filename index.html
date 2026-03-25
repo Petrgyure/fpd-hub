@@ -845,7 +845,12 @@ const FPD = (() => {
     });
 
     // Build nav
-    let navHtml = `<div class="cl-nav-title">Sections</div>`;
+    state.qrSection = null;
+    let navHtml = `
+      <div class="cl-nav-title">Sections</div>
+      <a class="cl-nav-item active" data-qr-mod="" onclick="FPD.filterQR(null)">
+        <span class="cl-nav-item-label">All sections</span>
+      </a>`;
     groups.forEach(({ m, secs }) => {
       const badge = m.track === 'google'
         ? '<span class="tag tag-google" style="font-size:9px;padding:1px 6px">Google</span>'
@@ -855,7 +860,7 @@ const FPD = (() => {
       const trackAttr = m.track ? ` class="track-filter" data-track="${m.track}"` : '';
       navHtml += `
         <div${trackAttr}>
-          <a class="cl-nav-item" onclick="document.getElementById('qrg-${m.id}')?.scrollIntoView({behavior:'smooth',block:'start'})">
+          <a class="cl-nav-item" data-qr-mod="${m.id}" onclick="FPD.filterQR('${m.id}')">
             <span class="cl-nav-item-label">${m.title}</span>
             <span class="cl-nav-item-meta">
               ${badge}
@@ -883,9 +888,10 @@ const FPD = (() => {
       });
 
       const modBadges = platformBadges(m, null);
-      const trackAttr = m.track ? ` class="track-filter" data-track="${m.track}"` : '';
+      const baseClass = m.track ? `track-filter` : '';
+      const trackData = m.track ? ` data-track="${m.track}"` : '';
       contentHtml += `
-        <div${trackAttr}>
+        <div class="${baseClass}" ${trackData} data-qr-wrap>
           <div class="qr-group" id="qrg-${m.id}">
             <div class="qr-group-head">
               <span class="qr-group-title">${m.title}</span>
@@ -1407,8 +1413,24 @@ const FPD = (() => {
     goTab('learn');
   }
 
+  function filterQR(modId) {
+    state.qrSection = modId || null;
+    // Update nav active state
+    document.querySelectorAll('.cl-nav-item[data-qr-mod]').forEach(el => {
+      const isAll = el.dataset.qrMod === '';
+      el.classList.toggle('active', isAll ? !state.qrSection : el.dataset.qrMod === state.qrSection);
+    });
+    // Show/hide groups
+    document.querySelectorAll('[data-qr-wrap]').forEach(el => {
+      const group = el.querySelector('.qr-group[id]');
+      if (!group) return;
+      const groupId = group.id.replace('qrg-', '');
+      el.style.display = (!state.qrSection || groupId === state.qrSection) ? '' : 'none';
+    });
+  }
+
   // Public API
-  return { init, toggle, goModule, goTab, setFilter, resetAll, tipToggle };
+  return { init, toggle, goModule, goTab, setFilter, resetAll, tipToggle, filterQR };
 
 })();
 
