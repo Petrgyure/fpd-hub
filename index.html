@@ -321,8 +321,8 @@ body.mf-leadgen   .track-filter[data-track="ecommerce"] { display: none; }
   display: flex; align-items: flex-start; gap: 9px;
   margin: 7px 0; font-size: 13px; line-height: 1.55; color: rgba(0,0,0,0.7);
 }
-.stage-task > span { flex: 1; }
-.stage-task .tip-wrap { flex-shrink: 0; margin-left: auto; }
+.stage-task > span:not(.tip-wrap) { flex: 1; }
+.stage-task .tip-wrap { flex-shrink: 0; }
 .stage-task input[type="checkbox"] {
   margin-top: 2px; flex-shrink: 0;
   width: 14px; height: 14px;
