@@ -254,6 +254,17 @@ body.mf-leadgen   .track-filter[data-track="ecommerce"] { display: none; }
 .qr-card-body p { font-size: 13px; }
 
 /* ===== CHECKLISTS ===== */
+.cl-layout { display: grid; grid-template-columns: 200px 1fr; gap: 24px; align-items: start; }
+.cl-nav { position: sticky; top: 20px; background: #fff; border-radius: 16px; border: 1.25px solid rgba(0,0,0,0.08); padding: 14px 0; }
+.cl-nav-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: rgb(154,154,154); padding: 0 16px 10px; }
+.cl-nav-item { display: flex; flex-direction: column; gap: 5px; padding: 8px 16px; cursor: pointer; text-decoration: none; border-left: 2px solid transparent; transition: all 0.15s; }
+.cl-nav-item:hover { background: rgb(247,247,250); }
+.cl-nav-item.active { border-left-color: #7839EE; background: rgba(120,57,238,0.04); }
+.cl-nav-item-label { font-size: 12.5px; font-weight: 500; color: #000; line-height: 1.35; }
+.cl-nav-item-meta { display: flex; align-items: center; gap: 5px; }
+.cl-nav-bar-wrap { flex: 1; height: 3px; background: rgba(0,0,0,0.08); border-radius: 2px; overflow: hidden; max-width: 60px; }
+.cl-nav-bar { height: 100%; background: #22C55E; border-radius: 2px; }
+.cl-nav-count { font-size: 10px; color: rgb(154,154,154); font-weight: 600; white-space: nowrap; }
 .cl-group { margin-bottom: 32px; }
 .cl-group-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .cl-group-title { font-size: 15px; font-weight: 600; color: #000000; letter-spacing: -0.01em; }
@@ -854,24 +865,40 @@ const FPD = (() => {
   // ── RENDER: CHECKLISTS ────────────────────────────────────
   function renderChecklists() {
     renderSidebar(false);
-    document.getElementById('content').classList.add('narrow');
+    document.getElementById('content').classList.remove('narrow');
 
-    let html = `
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
-        <div class="page-title" style="margin:0">Checklists</div>
-        <button class="reset-btn" onclick="FPD.resetAll()">Reset all progress</button>
-      </div>
-      <div class="page-sub">Pre-launch and implementation checklists. Check off as you go — progress is saved in your browser.</div>
-    `;
-
+    // Collect module groups first (for nav + content)
+    const groups = [];
     parsed.modules.forEach(m => {
       const clSecs = m.sections.filter(s => s.checklist && !s.apex);
       if (!clSecs.length) return;
-
       let modTotal = 0, modDone = 0;
       clSecs.forEach(s => { const t = countRawCbs(s.raw); modTotal += t; modDone += countChecked(s.id, t); });
-      const modPct = modTotal > 0 ? Math.round(modDone/modTotal*100) : 0;
+      groups.push({ m, clSecs, modTotal, modDone, modPct: modTotal > 0 ? Math.round(modDone/modTotal*100) : 0 });
+    });
 
+    // Build nav
+    let navHtml = `<div class="cl-nav-title">Jump to</div>`;
+    groups.forEach(({ m, modTotal, modDone, modPct }) => {
+      const badge = m.track === 'google'
+        ? '<span class="tag tag-google" style="font-size:9px;padding:1px 6px">Google</span>'
+        : m.track === 'meta'
+        ? '<span class="tag tag-meta" style="font-size:9px;padding:1px 6px">Meta</span>'
+        : '';
+      navHtml += `
+        <a class="cl-nav-item" onclick="document.getElementById('clg-${m.id}')?.scrollIntoView({behavior:'smooth',block:'start'})">
+          <span class="cl-nav-item-label">${m.title}</span>
+          <span class="cl-nav-item-meta">
+            ${badge}
+            <span class="cl-nav-bar-wrap"><span class="cl-nav-bar" style="width:${modPct}%"></span></span>
+            <span class="cl-nav-count">${modDone}/${modTotal}</span>
+          </span>
+        </a>`;
+    });
+
+    // Build content groups
+    let contentHtml = '';
+    groups.forEach(({ m, clSecs, modTotal, modDone, modPct }) => {
       let cards = '';
       clSecs.forEach(s => {
         const t = countRawCbs(s.raw);
@@ -886,12 +913,11 @@ const FPD = (() => {
             <div class="mc">${rendered}</div>
           </div>`;
       });
-
       const modBadges = platformBadges(m, null);
       const clTrackAttr = m.track ? ` class="track-filter" data-track="${m.track}"` : '';
-      html += `
+      contentHtml += `
         <div${clTrackAttr}>
-          <div class="cl-group">
+          <div class="cl-group" id="clg-${m.id}">
             <div class="cl-group-head">
               <span class="cl-group-title">${m.title}</span>
               ${modBadges ? `<span class="cl-group-badges">${modBadges}</span>` : ''}
@@ -902,6 +928,18 @@ const FPD = (() => {
           </div>
         </div>`;
     });
+
+    let html = `
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+        <div class="page-title" style="margin:0">Checklists</div>
+        <button class="reset-btn" onclick="FPD.resetAll()">Reset all progress</button>
+      </div>
+      <div class="page-sub">Pre-launch and implementation checklists. Check off as you go — progress is saved in your browser.</div>
+      <div class="cl-layout">
+        <nav class="cl-nav">${navHtml}</nav>
+        <div>${contentHtml}</div>
+      </div>
+    `;
 
     document.getElementById('content').innerHTML = html;
     applyFilter();
